@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>우리 마을 가꾸기 3D – 바다 마을 · 산 마을 · 들 마을</title>
+<meta name="description" content="바다 마을·산 마을·들 마을을 직접 가꾸며 지형에 따라 마을이 어떻게 달라지는지 알아보는 3D 사회 수업 게임">
+<meta property="og:title" content="우리 마을 가꾸기 3D">
+<meta property="og:description" content="바다 마을·산 마을·들 마을을 직접 가꾸며 지형과 마을 발달의 관계를 알아봐요.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏘️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#2b3a42;--card:rgba(255,255,255,.92);--accent:#ff8a3d;--sea:#2f8fd8;--mt:#4c9a4a;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:'Noto Sans KR',sans-serif;color:var(--ink);background:#bfe6ff}
+  canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  button{font-family:inherit;cursor:pointer}
+  .card{background:var(--card);border-radius:16px;box-shadow:0 6px 20px rgba(30,60,90,.18);backdrop-filter:blur(6px)}
+  #top{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;z-index:5}
+  #top .title{font-family:'Jua',sans-serif;font-size:22px;white-space:nowrap}
+  .tabs{display:flex;gap:6px}
+  .tabs button{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:7px 14px;background:#e9eef2;color:#567}
+  .tabs button.on.coast{background:var(--sea);color:#fff}
+  .tabs button.on.mountain{background:var(--mt);color:#fff}
+  .tabs button.on.plain{background:#d99a14;color:#fff}
+  .stats{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .stat{background:#f3f6f8;border-radius:10px;padding:4px 10px;font-size:14px;white-space:nowrap}
+  .stat b{font-size:16px;margin-left:3px}
+  #tools{position:fixed;left:10px;top:var(--top-h,84px);bottom:76px;width:200px;overflow-y:auto;padding:8px;display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:5px;z-index:4}
+  .tool{border:2px solid transparent;border-radius:12px;background:#f5f8fa;padding:5px 3px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:12.5px;line-height:1.2}
+  .tool.sep{grid-column:1/-1;background:none;font-family:'Jua';font-size:13px;color:#789;padding:4px 0 0;cursor:default}
+  .tool .ic{font-size:21px}
+  .tool small{display:block;color:#789;font-size:11px}
+  .tool.on{border-color:var(--accent);background:#fff3e8}
+  .tool.lock{opacity:.45}
+  #panel{position:fixed;right:10px;top:var(--top-h,84px);bottom:76px;width:300px;overflow-y:auto;padding:12px 14px;z-index:4}
+  #panel h3{font-family:'Jua';font-weight:400;font-size:17px;margin:10px 0 4px}
+  #panel h3:first-child{margin-top:0}
+  #panel p{margin:0;font-size:13.5px;line-height:1.55}
+  #era{background:#fff8e6;border-left:4px solid var(--accent);padding:6px 8px;border-radius:6px}
+  #missions{list-style:none;padding:0;margin:0;font-size:13.5px}
+  #missions li{padding:3px 0}
+  #missions li.ok{color:#2e7d32;text-decoration:line-through}
+  #chart{width:100%;height:110px;background:#f7fafc;border-radius:8px}
+  #log{font-size:12.5px;line-height:1.5;max-height:220px;overflow-y:auto}
+  #log div{padding:3px 0;border-bottom:1px dashed #dde5ea}
+  #log b{color:var(--accent);margin-right:4px}
+  #bottom{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:8px;padding:8px;z-index:5;flex-wrap:wrap;justify-content:center}
+  #bottom button{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:9px 14px;background:#e9eef2;color:var(--ink)}
+  #bottom button.primary{background:var(--accent);color:#fff}
+  #bottom button.playing{background:#e53935;color:#fff}
+  #tip{position:fixed;pointer-events:none;padding:6px 9px;font-size:12.5px;line-height:1.45;z-index:6;display:none;max-width:240px}
+  #toast{position:fixed;top:var(--top-h,84px);left:50%;transform:translateX(-50%);padding:9px 16px;font-size:14px;z-index:7;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80vw;text-align:center}
+  #toast.show{opacity:1}
+  #modal{position:fixed;inset:0;background:rgba(20,40,60,.45);display:flex;align-items:center;justify-content:center;z-index:10}
+  #modal[hidden]{display:none}
+  #modal .card{width:min(720px,94vw);max-height:90vh;overflow-y:auto;padding:20px 24px}
+  #modal h2{font-family:'Jua';font-weight:400;margin:0 0 10px}
+  #modal table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+  #modal th,#modal td{padding:6px 8px;border-bottom:1px solid #e3e9ee;text-align:center}
+  #modal th:first-child,#modal td:first-child{text-align:left}
+  #modal ol{font-size:14px;line-height:1.8;padding-left:20px}
+  .stat.save{font-size:12px;color:#5a7;background:#eef7ef}
+  .stat.save.warn{color:#b23c17;background:#fff0e6}
+  .confirm-btns{display:flex;gap:8px;margin-top:12px}
+  .confirm-btns button{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:9px 18px;background:#e9eef2;color:var(--ink)}
+  .confirm-btns #confirm-yes{background:#e53935;color:#fff}
+  #modal-close[hidden]{display:none}
+  #modal-close{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:9px 18px;background:var(--accent);color:#fff;margin-top:8px}
+  #panel-toggle{display:none}
+  @media (max-width:900px){
+    #panel{display:none;left:220px;width:auto}
+    #panel.open{display:block}
+    #panel-toggle{display:inline-block}
+    #top .title{font-size:18px}
+  }
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="top" class="card">
+  <div class="title">🏘️ 우리 마을 가꾸기</div>
+  <div class="tabs">
+    <button id="tab-coast" class="coast on">🌊 바다 마을</button>
+    <button id="tab-mountain" class="mountain">⛰️ 산 마을</button>
+    <button id="tab-plain" class="plain">🌾 들 마을</button>
+  </div>
+  <div class="stats">
+    <div class="stat">📅<b id="s-year"></b></div>
+    <div class="stat">👪 인구<b id="s-pop"></b></div>
+    <div class="stat">💰 예산<b id="s-money"></b></div>
+    <div class="stat">🏠 집<b id="s-house"></b></div>
+    <div class="stat">💼 일자리<b id="s-jobs"></b></div>
+    <div class="stat">🌿 환경<b id="s-env"></b></div>
+    <div class="stat save" id="s-save"></div>
+  </div>
+</div>
+
+<div id="tools" class="card"></div>
+
+<div id="panel" class="card">
+  <h3>🗺️ 지형 이야기</h3>
+  <p id="terrain-desc"></p>
+  <h3>📜 지금은 어떤 시대?</h3>
+  <p id="era"></p>
+  <h3>🎯 미션</h3>
+  <ul id="missions"></ul>
+  <h3>📈 인구 변화</h3>
+  <canvas id="chart" width="560" height="220"></canvas>
+  <h3>📝 마을 기록</h3>
+  <div id="log"></div>
+</div>
+
+<div id="bottom" class="card">
+  <button id="btn-next" class="primary">⏩ 5년 지나기</button>
+  <button id="btn-auto">▶ 자동 발전 보기</button>
+  <button id="btn-compare">⚖️ 마을 비교</button>
+  <button id="btn-reset">↺ 다시 시작</button>
+  <button id="panel-toggle">📋 정보</button>
+</div>
+
+<div id="tip" class="card"></div>
+<div id="toast" class="card"></div>
+<div id="modal" hidden><div class="card"><div id="modal-body"></div><button id="modal-close">닫기</button></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ---------------- 기본 설정 ---------------- */
+const N = 20, START_YEAR = 1970, END_YEAR = 2030, STEP = 5;
+const wx = x => x - N/2 + 0.5, wz = z => z - N/2 + 0.5;
+
+function hash(x,z,s){ const v=Math.sin(x*127.1+z*311.7+s*74.7)*43758.5453; return v-Math.floor(v); }
+function noise(x,z,s){
+  const xi=Math.floor(x), zi=Math.floor(z), xf=x-xi, zf=z-zi;
+  const u=xf*xf*(3-2*xf), w=zf*zf*(3-2*zf);
+  const a=hash(xi,zi,s), b=hash(xi+1,zi,s), c=hash(xi,zi+1,s), d=hash(xi+1,zi+1,s);
+  return a+(b-a)*u+(c-a)*w+(a-b-c+d)*u*w;
+}
+const q = h => Math.round(h*4)/4;
+const valleyC = x => N/2 - 0.5 + Math.sin(x*0.35)*2;
+const riverZ = x => 5 + Math.sin(x*0.4)*1.8;
+
+/* ---------------- Three.js 장면 ---------------- */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#bfe6ff');
+scene.fog = new THREE.Fog('#bfe6ff', 45, 80);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+camera.position.set(17, 21, 21);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.maxPolarAngle = 1.32;
+controls.minDistance = 8; controls.maxDistance = 45;
+
+scene.add(new THREE.HemisphereLight('#ffffff', '#7a9a6a', 1.1));
+const sun = new THREE.DirectionalLight('#fff4dd', 1.8);
+sun.position.set(12, 22, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera, {left:-16,right:16,top:16,bottom:-16,near:1,far:60});
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+
+const matCache = {};
+function mat(c, opts){
+  const k = c + (opts? JSON.stringify(opts):'');
+  return matCache[k] ||= new THREE.MeshStandardMaterial(Object.assign({color:c, flatShading:true, roughness:0.9}, opts||{}));
+}
+function box(w,h,d,c,x=0,y=0,z=0){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(c));
+  m.position.set(x,y+h/2,z); m.castShadow = m.receiveShadow = true; return m;
+}
+function cone(r,h,seg,c,x=0,y=0,z=0){
+  const m = new THREE.Mesh(new THREE.ConeGeometry(r,h,seg), mat(c));
+  m.position.set(x,y+h/2,z); m.castShadow = true; return m;
+}
+function cyl(r1,r2,h,seg,c,x=0,y=0,z=0){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg), mat(c));
+  m.position.set(x,y+h/2,z); m.castShadow = true; return m;
+}
+
+// 구름
+const clouds = [];
+for(let i=0;i<6;i++){
+  const g = new THREE.Group();
+  for(let j=0;j<3;j++){
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8+hash(i,j,9)*0.6,0), mat('#ffffff'));
+    m.position.set(j*0.9-0.9, hash(i,j,3)*0.4, hash(j,i,4)*0.6); g.add(m);
+  }
+  g.position.set(-20+i*7, 12+hash(i,1,2)*3, -14+hash(i,2,1)*10); g.scale.setScalar(0.7);
+  scene.add(g); clouds.push(g);
+}
+
+/* ---------------- 건물/도구 정의 ---------------- */
+const TOOLS = {
+  look:    {name:'둘러보기', icon:'✋', cost:0,   year:1970},
+  road:    {name:'도로',     icon:'🛣️', cost:10,  year:1970, paint:true},
+  house:   {name:'주택',     icon:'🏠', cost:50,  year:1970},
+  farm:    {name:'농경지',   icon:'🌾', cost:30,  year:1970, paint:true},
+  port:    {name:'항구',     icon:'⚓', cost:200, year:1970},
+  tree:    {name:'숲 가꾸기', icon:'🌲', cost:5,   year:1970, paint:true},
+  shop:    {name:'상가',     icon:'🏪', cost:120, year:1980},
+  factory: {name:'공장',     icon:'🏭', cost:300, year:1980},
+  apt:     {name:'아파트',   icon:'🏢', cost:250, year:1990},
+  school:  {name:'학교',     icon:'🏫', cost:200, year:1970, group:'city'},
+  station: {name:'기차역',   icon:'🚉', cost:400, year:1975, group:'city'},
+  hospital:{name:'병원',     icon:'🏥', cost:300, year:1985, group:'city'},
+  park:    {name:'공원',     icon:'⛲', cost:80,  year:1995, group:'city'},
+  mart:    {name:'대형마트', icon:'🛒', cost:350, year:1995, group:'city'},
+  office:  {name:'고층빌딩', icon:'🏙️', cost:500, year:2000, group:'city'},
+  stadium: {name:'경기장',   icon:'🏟️', cost:600, year:2005, group:'city'},
+  tourism: {name:'관광지',   icon:'🏖️', cost:250, year:1990},
+  wind:    {name:'풍력발전', icon:'🌬️', cost:200, year:2010},
+  bulldoze:{name:'철거',     icon:'🧹', cost:5,   year:1970, paint:true},
+};
+
+const HINTS = {
+  paddy:'🌾 평평한 땅은 물을 대기 쉬워 논농사에 알맞아요.',
+  terrace:'⛰️ 비탈진 땅은 계단처럼 깎아 밭을 만들어요(계단식 밭). 평지보다 수확이 적어요.',
+  port:'⚓ 바다와 닿은 곳에는 항구가 생겨 수산업과 무역이 발달해요!',
+  steepRoad:'🚧 비탈진 땅은 도로를 놓는 데 돈이 3배나 들어요.',
+  factoryCoast:'🏭 바닷가의 넓은 평지는 배로 원료를 들여오고 제품을 실어 보내기 좋아 공장이 많이 생겨요.',
+  factoryMountain:'🏭 산지는 평지가 좁아 공장을 많이 지을 수 없어요.',
+  beach:'🏖️ 모래사장은 여름철 해수욕장으로 인기 있는 관광지가 돼요.',
+  ski:'⛷️ 눈이 많이 오는 높은 산은 겨울철 스키장으로 이용돼요.',
+  windbreak:'🌳 바닷가 숲(방풍림)은 거센 바닷바람과 날리는 모래를 막아 줘요.',
+  mountainForest:'🌲 산의 숲은 산사태와 홍수를 막고 맑은 공기를 만들어요.',
+  apt:'🏢 넓은 평지에 아파트가 들어서면 인구가 빠르게 늘어요.',
+  windCoast:'🌬️ 바다에서 불어오는 강한 바람으로 전기를 만들어요.',
+  windMountain:'🌬️ 높은 산 능선의 센 바람으로 전기를 만들어요.',
+  windPlain:'🌬️ 막힌 것이 없는 언덕 위의 바람으로 전기를 만들어요.',
+  factoryPlain:'🏭 넓은 평야는 공장을 짓기 쉽고, 도로·철도로 제품을 실어 나르기 좋아요.',
+  school:'🏫 사람들이 모여 살면 아이들이 다닐 학교가 꼭 필요해요.',
+  station:'🚉 평평한 들판은 철도를 놓기 쉬워요. 기차역 주변으로 사람들이 모여 도시가 커져요.',
+  hospital:'🏥 인구가 많아지면 병원 같은 공공시설이 필요해요.',
+  park:'⛲ 건물이 빽빽한 도시에서는 공원이 사람들의 쉼터이자 허파 역할을 해요.',
+  mart:'🛒 사람이 많고 교통이 편리한 곳에 대형마트 같은 큰 상업 시설이 생겨요.',
+  office:'🏙️ 회사가 모인 고층 빌딩 지역은 도시의 중심지(도심)가 돼요.',
+  stadium:'🏟️ 경기장 같은 큰 시설은 넓은 평지와 많은 인구가 있는 도시에 생겨요.',
+  themepark:'🎡 교통이 편리하고 사람이 많은 들 마을에는 놀이공원 같은 도시형 관광지가 생겨요.',
+  bridge:'🌉 강 위에는 다리를 놓아 양쪽 마을을 이어요. 비용이 4배예요.',
+  noSchool:'🏫 학교가 없어서 아이가 있는 가족들이 이사 오기를 망설여요!',
+  noHospital:'🏥 병원이 없어서 사람들이 불편해해요. 인구가 잘 늘지 않아요.',
+  envLow:'⚠️ 환경이 나빠져 사람들이 이사 오지 않아요! 관광 수입도 줄어들어요. 숲을 가꾸거나 공장을 줄여 보세요.',
+};
+
+const TERRAIN_DESC = {
+  coast:'바다와 맞닿은 마을이에요. 바닷가에는 <b>모래사장</b>, 안쪽에는 <b>넓은 평지</b>, 뒤쪽에는 <b>낮은 언덕</b>이 있어요. 바다를 이용한 <b>어업·항구·관광</b>이 발달하기 좋아요.',
+  plain:'넓고 평평한 <b>들판(평야)</b>이 펼쳐진 마을이에요. 강이 흘러 물을 얻기 쉬워 예로부터 <b>논농사</b>가 발달했어요. 땅이 평평해 <b>도로·철도·아파트·큰 건물</b>을 짓기 쉬워 <b>큰 도시</b>로 자라기 좋아요. 한쪽 구석에는 낮은 언덕이 있어요.',
+  mountain:'높은 산으로 둘러싸인 마을이에요. 가운데로 <b>강</b>이 흐르고, 강 옆에만 <b>좁은 평지</b>가 있어요. <b>비탈</b>이 많아 건물을 짓기 어렵지만 <b>숲·맑은 공기·눈 덮인 산</b>을 이용할 수 있어요.',
+};
+
+const ERA = {
+  coast:[
+    '🐟 작은 어촌 마을이에요. 사람들은 바다에서 물고기를 잡고, 평지에서 농사를 지어요.',
+    '⛵ 고기잡이배가 늘어나요. 항구 주변에 사람들이 모여 살기 시작해요.',
+    '🏭 산업화 시대! 바닷가 평지는 배로 원료를 들여오기 좋아 공장이 들어서요. (상가·공장 해금)',
+    '🚚 일자리를 찾아 농촌 사람들이 바닷가 도시로 이사 와요.',
+    '🏢 아파트가 생기고 도시가 커져요. 바다 경치를 보러 관광객도 찾아와요. (아파트·해수욕장 해금)',
+    '🛍️ 도로가 넓어지고 해안을 따라 상가가 늘어나요.',
+    '🌊 바다 오염 문제가 생겨요. 해안 숲(방풍림)과 갯벌을 지키는 일이 중요해져요.',
+    '🚢 항구는 큰 무역항으로 발전하거나, 관광 항구로 바뀌어요.',
+    '🌬️ 바닷바람을 이용한 풍력발전을 지을 수 있어요! (풍력발전 해금)',
+    '🏄 요트·서핑 같은 해양 레저와 해산물 축제가 마을을 알려요.',
+    '🌡️ 기후 변화로 바닷물 높이가 올라갈 수 있어요. 해안 개발을 조심해야 해요.',
+    '✨ 우리 바다 마을의 미래 모습을 완성해 보세요.',
+    '🏁 2030년! 우리 바다 마을은 어떻게 변했나요?',
+  ],
+  mountain:[
+    '🌄 산골 마을이에요. 골짜기의 좁은 평지에 논을, 비탈에는 밭을 만들어요.',
+    '🍄 산에서 나무와 약초, 산나물을 얻어 생활해요.',
+    '🛣️ 도로가 놓이며 마을이 바깥 세상과 연결돼요. 평지가 좁아 공장은 짓기 어려워요. (상가·공장 해금)',
+    '🧳 젊은 사람들이 일자리를 찾아 큰 도시로 떠나기도 해요.',
+    '⛷️ 높은 산에 스키장 같은 관광지를 만들 수 있어요! (아파트·스키장 해금)',
+    '🥬 서늘한 날씨를 이용한 고랭지 농업(배추·감자)이 발달해요.',
+    '🌲 산림을 지키고 산사태를 막는 것이 중요해져요. 숲을 가꿔요.',
+    '🚇 터널과 고속도로가 생겨 큰 도시와 가까워져요.',
+    '🌬️ 바람이 센 높은 산 능선에 풍력발전을 지을 수 있어요! (풍력발전 해금)',
+    '🏕️ 자연휴양림·캠핑장·둘레길 같은 생태 관광이 인기예요.',
+    '🏡 귀농·귀촌으로 다시 산골 마을을 찾는 사람들이 생겨요.',
+    '✨ 우리 산 마을의 미래 모습을 완성해 보세요.',
+    '🏁 2030년! 우리 산 마을은 어떻게 변했나요?',
+  ],
+};
+
+ERA.plain = [
+  '🌾 넓은 들판(평야)에 논이 펼쳐진 농촌 마을이에요. 강물을 끌어와 쌀농사를 지어요.',
+  '🚂 철도가 놓이고 기차역이 생겨요. 사람과 물건이 빠르게 오가요. (기차역 해금)',
+  '🏭 평평하고 넓은 땅은 공장과 도로를 짓기 쉬워요. 공업 단지가 생겨요. (상가·공장 해금)',
+  '🏥 인구가 늘어 학교와 병원이 더 필요해져요. (병원 해금)',
+  '🏢 논이 아파트 단지로 바뀌기 시작해요. 농촌이 도시로 변해요(도시화). (아파트·놀이공원 해금)',
+  '🛒 대형마트와 공원이 생겨 생활이 편리해져요. (공원·대형마트 해금)',
+  '🏙️ 고층 빌딩이 들어서며 회사와 일자리가 모이는 중심지가 생겨요. (고층빌딩 해금)',
+  '🏟️ 경기장 같은 큰 시설이 생겨 주변 지역 사람들도 찾아와요. (경기장 해금)',
+  '🌬️ 낮은 언덕 위에 풍력발전을 지을 수 있어요. 도시엔 교통 혼잡 문제가 생겨요. (풍력발전 해금)',
+  '🌳 빽빽한 도시에 녹지가 부족해요. 공원을 늘려 쾌적한 도시를 만들어요.',
+  '🌾 도시가 커지며 논이 많이 줄었어요. 남은 농지를 어떻게 지킬까요?',
+  '✨ 우리 들 마을의 미래 모습을 완성해 보세요.',
+  '🏁 2030년! 우리 들 마을은 어떻게 변했나요?',
+];
+
+const MISSIONS = {
+  coast:[
+    {t:'⚓ 항구 2개 짓기', f:(c)=>c.port>=2},
+    {t:'🏭 공장을 지어 일자리 만들기', f:(c)=>c.factory>=1},
+    {t:'🏖️ 해수욕장 만들기', f:(c)=>c.tourism>=1},
+    {t:'👪 인구 400명 달성', f:(c,M)=>M.pop>=400},
+    {t:'🌿 2010년 이후 환경 60점 이상', f:(c,M)=>M.year>=2010 && M.env>=60},
+  ],
+  mountain:[
+    {t:'⛰️ 계단식 밭 3개 만들기', f:(c)=>c.terrace>=3},
+    {t:'🛣️ 도로 20칸 이상 놓기', f:(c)=>c.road>=20},
+    {t:'⛷️ 스키장 만들기', f:(c)=>c.tourism>=1},
+    {t:'🌲 숲 15칸 가꾸기', f:(c)=>c.tree>=15},
+    {t:'👪 인구 250명 달성', f:(c,M)=>M.pop>=250},
+  ],
+};
+
+MISSIONS.plain = [
+  {t:'🏫 학교와 🏥 병원 짓기', f:(c)=>c.school>=1 && c.hospital>=1},
+  {t:'🚉 기차역 짓기', f:(c)=>c.station>=1},
+  {t:'🏙️ 고층빌딩 3개 짓기', f:(c)=>c.office>=3},
+  {t:'👪 인구 800명 달성', f:(c,M)=>M.pop>=800},
+  {t:'⛲ 공원 3개 + 2010년 이후 환경 50점 이상', f:(c,M)=>c.park>=3 && M.year>=2010 && M.env>=50},
+];
+
+const START_PRESET = {
+  plain:[['road',6],['house',3],['farm',7],['tree',2]],
+  coast:[['road',6],['house',3],['farm',3],['port',1],['tree',2]],
+  mountain:[['road',5],['house',3],['farm',4],['tree',4]],
+};
+const PLAN = {
+  plain:{1970:[['road',6],['house',4],['farm',6],['school',1]],1975:[['road',8],['station',1],['house',4],['farm',4]],
+    1980:[['road',8],['factory',2],['shop',3],['house',4]],1985:[['hospital',1],['house',5],['shop',2],['factory',1]],
+    1990:[['road',10],['apt',6],['school',1],['tourism',1]],1995:[['mart',1],['park',2],['apt',4],['road',6]],
+    2000:[['office',3],['apt',4],['shop',2]],2005:[['road',8],['stadium',1],['office',2],['apt',4]],
+    2010:[['wind',2],['park',2],['hospital',1],['apt',3]],2015:[['road',8],['office',3],['apt',4],['park',1]],
+    2020:[['apt',4],['office',2],['tree',5],['mart',1]],2025:[['park',2],['apt',3],['office',2]]},
+  coast:{1970:[['road',6],['house',3],['farm',3]],1975:[['house',4],['farm',3],['port',1]],1980:[['road',8],['factory',2],['shop',2]],
+    1985:[['house',6],['shop',1],['port',1]],1990:[['apt',3],['tourism',1]],1995:[['road',6],['apt',2],['shop',2]],2000:[['tree',8],['tourism',1]],
+    2005:[['apt',2],['shop',2]],2010:[['wind',3],['tree',3]],2015:[['apt',2],['tourism',1]],2020:[['wind',2],['tree',4]],2025:[['apt',1],['shop',1]]},
+  mountain:{1970:[['road',4],['house',2],['farm',4]],1975:[['farm',3],['house',2]],1980:[['road',10],['shop',1],['factory',1]],
+    1985:[['house',2]],1990:[['road',6],['tourism',1],['house',3],['shop',1]],1995:[['farm',3],['apt',1]],2000:[['tree',12]],
+    2005:[['road',4],['tourism',1],['house',2]],2010:[['wind',3]],2015:[['house',3],['tree',5]],2020:[['house',3],['shop',1]],2025:[['tree',5],['apt',1]]},
+};
+
+/* ---------------- 지형 만들기 ---------------- */
+function genTerrain(M){
+  for(let x=0;x<N;x++) for(let z=0;z<N;z++){
+    let h, kind;
+    if(M.type==='coast'){
+      const d = x + Math.sin(z*0.55)*1.3 + (noise(x*0.4,z*0.4,1)-0.5)*1.5;
+      if(d<5){ h=-0.5; kind='sea'; }
+      else if(d<6.6){ h=0.25; kind='sand'; }
+      else { h=q(0.5 + Math.max(0,d-13)*0.32 + noise(x*0.3,z*0.3,2)*0.4); kind = h>=2.25?'rock':'grass'; }
+    } else if(M.type==='plain'){
+      const rz = riverZ(x);
+      if(Math.abs(z-rz)<0.85){ h=-0.3; kind='river'; }
+      else { h = q(0.5 + noise(x*0.3,z*0.3,6)*0.3 + Math.max(0,x+z-29)*0.3); kind = h>=2.25?'rock':'grass'; }
+    } else {
+      const dz = Math.abs(z - valleyC(x));
+      if(dz<0.9){ h=-0.3; kind='river'; }
+      else {
+        h = q(0.5 + Math.max(0,dz-1.5)*0.3 + noise(x*0.35,z*0.35,3)*(dz>3?0.9:0.25));
+        kind = h>=3.5?'snow':h>=2.5?'rock':'grass';
+      }
+    }
+    M.tiles.push({x,z,h,kind,water:kind==='sea'||kind==='river',b:null,variant:null,bmesh:null});
+  }
+}
+const get = (M,x,z) => (x<0||z<0||x>=N||z>=N)? null : M.tiles[x*N+z];
+const nbrs = (M,t) => [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dz])=>get(M,t.x+dx,t.z+dz)).filter(Boolean);
+function slope(M,t){ let s=0; for(const n of nbrs(M,t)) if(!n.water) s=Math.max(s,Math.abs(n.h-t.h)); return s; }
+const adjRoad = (M,t) => nbrs(M,t).some(n=>n.b==='road');
+const adjSea = (M,t) => nbrs(M,t).find(n=>n.kind==='sea');
+
+const TCOL = {sea:'#3b7fa8',river:'#4a8bb0',sand:'#f1d595',grass:'#86c66c',rock:'#a39783',snow:'#f4f7fa'};
+const unitBox = new THREE.BoxGeometry(1,1,1); unitBox.translate(0,0.5,0);
+function tileColor(t){
+  const c = new THREE.Color(TCOL[t.kind]);
+  if(t.kind==='grass') c.lerp(new THREE.Color('#5d9e4e'), Math.min(1,t.h/2.6));
+  const v = Math.floor(hash(t.x,t.z,5)*3)/3*0.06;
+  c.offsetHSL(0,0,v-0.03);
+  return '#'+c.getHexString();
+}
+function buildTerrain(M){
+  for(const t of M.tiles){
+    const m = new THREE.Mesh(unitBox, mat(tileColor(t)));
+    m.position.set(wx(t.x), -1, wz(t.z));
+    m.scale.y = t.h + 1;
+    m.receiveShadow = true; m.castShadow = !t.water;
+    m.userData.tile = t;
+    M.group.add(m); M.tileMeshes.push(m);
+  }
+  const base = box(N+0.02, 0.6, N+0.02, '#7b5e45', 0, -1.6, 0); M.group.add(base);
+  // 물(로우폴리 물결)
+  const wg = new THREE.PlaneGeometry(N, N, N, N); wg.rotateX(-Math.PI/2);
+  const water = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({color:'#5bc0eb',transparent:true,opacity:0.78,flatShading:true,roughness:0.3,metalness:0.1}));
+  water.position.y = -0.08; M.group.add(water); M.water = water;
+}
+
+function makeRoadPlan(M){
+  const plan = [];
+  if(M.type==='coast'){
+    const roadX = z => { for(let x=0;x<N;x++){ const t=get(M,x,z); if(t.kind==='grass') return x+1; } return 8; };
+    const main = []; for(let z=0;z<N;z++) main.push(get(M,roadX(z),z));
+    main.sort((a,b)=>Math.abs(a.z-10)-Math.abs(b.z-10));
+    plan.push(...main);
+    const x0 = roadX(10); for(let x=x0+1;x<17;x++) plan.push(get(M,x,10));
+    for(let z=4;z<N-3;z++) if(z!==10) plan.push(get(M,x0+6,z));
+    M.cx = x0+3; M.cz = 10;
+  } else if(M.type==='plain'){
+    const cand = [];
+    for(const z of [9,13,17]) for(let x=1;x<N-1;x++) cand.push(get(M,x,z));
+    for(const x of [3,7,11,15]) for(let z=1;z<N-1;z++) if(![9,13,17].includes(z)) cand.push(get(M,x,z));
+    cand.sort((a,b)=>Math.hypot(a.x-10,a.z-12)-Math.hypot(b.x-10,b.z-12));
+    plan.push(...cand);
+    M.cx = 10; M.cz = 12;
+  } else {
+    const main = [];
+    for(let x=0;x<N;x++){
+      const c = Math.round(valleyC(x)); let best=null;
+      for(let z=c+1;z<=c+3;z++){ const t=get(M,x,z); if(t && !t.water && (!best || t.h<best.h)) best=t; }
+      if(best) main.push(best);
+    }
+    main.sort((a,b)=>Math.abs(a.x-10)-Math.abs(b.x-10));
+    plan.push(...main);
+    // 반대편으로 건너는 다리 겸 도로, 산으로 오르는 길
+    const c10 = Math.round(valleyC(10));
+    for(let z=c10+3; z<N; z++) plan.push(get(M,10,z));
+    for(let z=c10-2; z>=0; z--) plan.push(get(M,10,z));
+    M.cx = 10; M.cz = c10+2;
+  }
+  M.roadPlan = plan.filter(Boolean); M.roadIdx = 0;
+}
+
+/* ---------------- 건설 규칙 ---------------- */
+function check(M, tool, t){
+  const T = TOOLS[tool], s = slope(M,t);
+  if(tool==='look') return {ok:false, msg:''};
+  if(M.year < T.year) return {ok:false, msg:`🔒 ${T.year}년부터 지을 수 있어요`};
+  if(tool==='bulldoze') return t.b ? {ok:true,cost:T.cost} : {ok:false,msg:'철거할 것이 없어요'};
+  if(t.water && !(tool==='road' && t.kind==='river')) return {ok:false, msg: t.kind==='sea'?'바다 위에는 지을 수 없어요':'강 위에는 지을 수 없어요 (도로는 다리로 놓을 수 있어요)'};
+  if(t.b) return {ok:false, msg:'이미 무언가 있어요 (철거 먼저)'};
+  const road = adjRoad(M,t);
+  const R = (extra) => Object.assign({ok:true,cost:T.cost}, extra||{});
+  const F = (msg) => ({ok:false,msg});
+  switch(tool){
+    case 'road':
+      if(t.water) return R({cost:T.cost*4, msg:'다리 공사: 비용 4배', hint:'bridge'});
+      if(s>1.25) return F('너무 가팔라 도로를 낼 수 없어요 (터널이 필요해요)');
+      if(t.kind==='snow') return F('눈 덮인 봉우리에는 길을 낼 수 없어요');
+      return s>0.5 ? R({cost:T.cost*3, msg:'비탈길 공사: 비용 3배', hint:'steepRoad'}) : R();
+    case 'house':
+      if(t.kind==='snow'||t.kind==='rock') return F('바위산에는 집을 짓기 어려워요');
+      if(s>0.75) return F('땅이 너무 가팔라 집을 지을 수 없어요');
+      return R();
+    case 'farm':
+      if(t.kind==='sand') return F('모래땅은 농사가 어려워요');
+      if(t.kind==='rock'||t.kind==='snow') return F('바위산이라 농사를 지을 수 없어요');
+      if(s>1) return F('너무 가팔라 밭도 만들 수 없어요');
+      return s>0.25 ? R({variant:'terrace',msg:'비탈이라 계단식 밭이 돼요',hint:'terrace'}) : R({variant:'paddy',msg:'평지라 논이 돼요',hint:'paddy'});
+    case 'port':
+      if(M.type==='mountain') return F('강이 좁고 얕아 큰 배가 다닐 수 없어요');
+      if(M.type==='plain') return F('들 마을의 강은 작은 배만 다녀서 항구를 지을 수 없어요');
+      if(!adjSea(M,t)) return F('바다와 맞닿은 땅에만 지을 수 있어요');
+      return R({hint:'port'});
+    case 'tree':
+      if(t.kind==='sand') return R({msg:'바닷가 방풍림',hint:'windbreak'});
+      return R(M.type==='mountain' && t.h>=1.5 ? {hint:'mountainForest'} : {});
+    case 'shop':
+      if(s>0.5) return F('땅이 비탈져 상가를 짓기 어려워요');
+      if(!road) return F('도로 옆에만 지을 수 있어요');
+      return R();
+    case 'factory':
+      if(s>0.25 || t.kind!=='grass') return F('공장은 넓고 평평한 땅이 필요해요');
+      if(!road) return F('도로 옆에만 지을 수 있어요');
+      return R({hint: M.type==='coast'?'factoryCoast':M.type==='plain'?'factoryPlain':'factoryMountain'});
+    case 'apt':
+      if(s>0.25 || t.kind!=='grass') return F('아파트는 평평한 땅이 필요해요');
+      if(!road) return F('도로 옆에만 지을 수 있어요');
+      return R({hint:'apt'});
+    case 'tourism':
+      if(M.type==='plain'){ if(s>0.25 || t.kind!=='grass') return F('놀이공원은 넓고 평평한 땅이 필요해요'); if(!road) return F('도로 옆에만 지을 수 있어요'); return R({variant:'themepark',hint:'themepark'}); }
+      if(M.type==='coast') return t.kind==='sand' ? R({variant:'beach',hint:'beach'}) : F('해수욕장은 모래사장에만 지을 수 있어요');
+      return t.h>=2 ? R({variant:'ski',hint:'ski'}) : F('스키장은 높은 산(해발 160m 이상)에 지어요');
+    case 'wind':
+      if(M.type==='plain') return t.h>=1.5 ? R({hint:'windPlain'}) : F('바람이 센 언덕 위(해발 120m 이상)에 지어요');
+      if(M.type==='coast') return (t.kind==='sand'||t.h>=2) ? R({hint:'windCoast'}) : F('바람이 센 바닷가나 언덕 위에 지어요');
+      return t.h>=2.5 ? R({hint:'windMountain'}) : F('바람이 센 높은 산 능선(해발 200m 이상)에 지어요');
+    case 'school': case 'station': case 'hospital': case 'mart': case 'office': case 'stadium':
+      if(s>0.25 || t.kind!=='grass') return F(`${T.name}: 넓고 평평한 땅이 필요해요`);
+      if(!road) return F('도로 옆에만 지을 수 있어요');
+      return R({hint:tool});
+    case 'park':
+      if(t.kind==='rock'||t.kind==='snow'||t.kind==='sand') return F('공원은 풀밭 위에 만들어요');
+      if(s>0.5) return F('땅이 너무 비탈져요');
+      return R({hint:'park'});
+  }
+  return F('');
+}
+
+/* ---------------- 건물 모델 ---------------- */
+const smokeMat = new THREE.MeshStandardMaterial({color:'#cfd8dc',transparent:true,opacity:0.55,flatShading:true});
+function buildMesh(M, tool, t){
+  const g = new THREE.Group(); const r = Math.floor(hash(t.x,t.z,11)*16);
+  switch(tool){
+    case 'road':{
+      if(t.water){
+        const y = -t.h + 0.02;
+        g.add(box(0.14,-t.h+0.02,0.14,'#9e9e9e',0,0,0));
+        g.add(box(1,0.08,0.9,'#8a8f94',0,y,0));
+        g.add(box(1,0.07,0.05,'#eceff1',0,y+0.08,0.43)); g.add(box(1,0.07,0.05,'#eceff1',0,y+0.08,-0.43));
+        if([get(M,t.x+1,t.z),get(M,t.x-1,t.z)].some(n=>n&&n.water)) g.rotation.y = Math.PI/2;
+      } else {
+        g.add(box(1,0.05,1,'#5f6b73'));
+        g.add(box(0.14,0.055,0.06,'#ffe082'));
+      }
+      break;}
+    case 'school':{
+      g.add(box(0.85,0.42,0.32,'#ffccbc',0,0,-0.28));
+      g.add(box(0.3,0.42,0.5,'#ffccbc',-0.28,0,0.12));
+      g.add(box(0.87,0.05,0.34,'#bf360c',0,0.42,-0.28));
+      g.add(box(0.12,0.12,0.03,'#ffffff',0.1,0.28,-0.11));
+      g.add(box(0.5,0.02,0.45,'#d7a86e',0.18,0,0.2));
+      g.add(box(0.02,0.5,0.02,'#9e9e9e',0.4,0,0.4)); g.add(box(0.12,0.08,0.01,'#e53935',0.46,0.42,0.4));
+      g.rotation.y = (r%4)*Math.PI/2; break;}
+    case 'hospital':{
+      g.add(box(0.72,0.75,0.62,'#ffffff'));
+      g.add(box(0.74,0.04,0.64,'#81d4fa',0,0.25,0)); g.add(box(0.74,0.04,0.64,'#81d4fa',0,0.5,0));
+      g.add(box(0.2,0.06,0.06,'#e53935',0,0.8,0)); g.add(box(0.06,0.06,0.2,'#e53935',0,0.8,0));
+      g.add(box(0.06,0.2,0.02,'#e53935',0,0.48,0.32)); g.add(box(0.2,0.06,0.02,'#e53935',0,0.55,0.32));
+      g.add(box(0.3,0.12,0.15,'#b3e5fc',0,0,0.38)); break;}
+    case 'station':{
+      g.add(box(1,0.06,0.42,'#bdbdbd',0,0,0.25));
+      g.add(box(1,0.03,0.05,'#5d4037',0,0,-0.12)); g.add(box(1,0.03,0.05,'#5d4037',0,0,-0.32));
+      g.add(box(0.48,0.32,0.3,'#ffe0b2',0,0.06,0.28));
+      const rf = cone(0.38,0.2,4,'#1565c0',0,0.38,0.28); rf.rotation.y=Math.PI/4; g.add(rf);
+      const train = new THREE.Group();
+      train.add(box(0.8,0.2,0.2,'#1e88e5')); train.add(box(0.82,0.06,0.21,'#ffffff',0,0.1,0));
+      train.position.set(0,0.03,-0.22); g.add(train);
+      g.userData.anim = (dt,time)=>{ train.position.x = Math.sin(time*0.5+t.x)*0.12; };
+      if([get(M,t.x,t.z+1),get(M,t.x,t.z-1)].some(n=>n&&n.b==='road')) g.rotation.y = 0; else g.rotation.y = Math.PI/2;
+      break;}
+    case 'park':{
+      g.add(box(0.96,0.04,0.96,'#8bc34a'));
+      g.add(cyl(0.22,0.22,0.02,10,'#4fc3f7',0.12,0.04,0.1));
+      g.add(cyl(0.04,0.04,0.12,6,'#e0e0e0',0.12,0.04,0.1));
+      for(const [ox,oz] of [[-0.3,-0.3],[-0.3,0.3],[0.32,-0.3]]){
+        g.add(cyl(0.025,0.03,0.15,5,'#6d4c41',ox,0.04,oz));
+        const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(0.15,0), mat(['#66bb6a','#9ccc65','#43a047'][(r+Math.round(ox*10))%3]));
+        crown.position.set(ox,0.3,oz); crown.castShadow=true; g.add(crown);
+      }
+      g.add(box(0.22,0.05,0.07,'#8d6e63',-0.05,0.08,-0.38));
+      g.add(box(0.06,0.01,0.9,'#e8d7b0',-0.12,0.04,0)); break;}
+    case 'mart':{
+      g.add(box(0.92,0.42,0.6,'#eceff1',0,0,-0.15));
+      g.add(box(0.94,0.1,0.62,'#fdd835',0,0.32,-0.15));
+      g.add(box(0.4,0.12,0.02,'#e53935',0,0.3,0.16));
+      g.add(box(0.92,0.02,0.32,'#78909c',0,0,0.32));
+      for(let i=0;i<4;i++) g.add(box(0.12,0.08,0.18,['#e53935','#1e88e5','#fafafa','#43a047'][(r+i)%4],-0.33+i*0.22,0.02,0.32));
+      g.rotation.y = (r%4)*Math.PI/2; break;}
+    case 'office':{
+      const h = 2.0 + (r%4)*0.35;
+      g.add(box(0.6,h,0.6,['#81d4fa','#90caf9','#b0bec5','#80cbc4'][r%4]));
+      for(let y=0.3;y<h-0.1;y+=0.3) g.add(box(0.62,0.04,0.62,'#546e7a',0,y,0));
+      g.add(box(0.3,0.15,0.3,'#cfd8dc',0,h,0));
+      g.add(box(0.02,0.35,0.02,'#eceff1',0.08,h+0.15,0.08));
+      break;}
+    case 'stadium':{
+      g.add(cyl(0.49,0.49,0.3,12,'#eceff1'));
+      g.add(cyl(0.35,0.35,0.31,12,'#43a047'));
+      g.add(box(0.4,0.005,0.02,'#ffffff',0,0.31,0));
+      for(const [ox,oz] of [[0.42,0.42],[-0.42,0.42],[0.42,-0.42],[-0.42,-0.42]]){ g.add(box(0.03,0.6,0.03,'#78909c',ox,0,oz)); g.add(box(0.1,0.06,0.04,'#fff59d',ox,0.6,oz)); }
+      break;}
+    case 'house':{
+      const walls=['#fff3e0','#ffe0b2','#f8bbd0','#e1f5fe'], roofs=['#d84315','#6d4c41','#1e88e5','#43a047'];
+      const n = 1 + (r%2);
+      for(let i=0;i<n;i++){
+        const ox = n===1?0:(i?0.22:-0.22), oz = n===1?0:(i?-0.18:0.18), s = n===1?1:0.72;
+        g.add(box(0.5*s,0.34*s,0.45*s,walls[(r+i)%4],ox,0,oz));
+        const rf = cone(0.42*s,0.3*s,4,roofs[(r+i*2)%4],ox,0.34*s,oz); rf.rotation.y=Math.PI/4; g.add(rf);
+      }
+      g.rotation.y = (r%4)*Math.PI/2; break;}
+    case 'apt':{
+      const h = 1.1 + (r%3)*0.3;
+      g.add(box(0.62,h,0.62,['#eceff1','#fff8e1','#e3f2fd'][r%3]));
+      for(let y=0.22;y<h-0.1;y+=0.24) g.add(box(0.64,0.05,0.64,'#90a4ae',0,y,0));
+      g.add(box(0.22,0.12,0.22,'#b0bec5',0,h,0)); break;}
+    case 'shop':{
+      g.add(box(0.76,0.38,0.7,'#fffde7'));
+      g.add(box(0.8,0.06,0.22,['#ef5350','#42a5f5','#66bb6a','#ffa726'][r%4],0,0.28,0.42));
+      g.add(box(0.45,0.12,0.04,'#ff7043',0,0.4,0.34));
+      g.rotation.y = (r%4)*Math.PI/2; break;}
+    case 'factory':{
+      g.add(box(0.86,0.42,0.7,'#b0bec5'));
+      for(let i=0;i<3;i++){ const s=box(0.28,0.12,0.7,'#78909c',-0.29+i*0.29,0.42,0); s.rotation.z=0.35; g.add(s); }
+      g.add(cyl(0.07,0.09,0.95,6,'#8d6e63',0.3,0.42,-0.22));
+      const puffs=[]; for(let i=0;i<3;i++){ const p=new THREE.Mesh(new THREE.IcosahedronGeometry(0.09,0),smokeMat); g.add(p); puffs.push(p); }
+      g.userData.anim = (dt,time)=>puffs.forEach((p,i)=>{ const k=(time*0.35+i/3)%1; p.position.set(0.3+k*0.25,1.4+k*0.9,-0.22); p.scale.setScalar(0.6+k*1.6); });
+      break;}
+    case 'port':{
+      const sea = adjSea(M,t); if(sea) g.rotation.y = Math.atan2(sea.x-t.x, sea.z-t.z);
+      g.add(box(0.92,0.1,0.92,'#a1887f'));
+      g.add(box(0.26,0.07,1.1,'#8d6e63',0.25,-t.h+0.02,1.0));
+      g.add(box(0.08,0.95,0.08,'#fbc02d',-0.3,0.1,-0.2));
+      g.add(box(0.08,0.06,0.9,'#fbc02d',-0.3,0.98,0.2));
+      g.add(box(0.3,0.16,0.16,'#e53935',0.15,0.1,-0.25));
+      g.add(box(0.3,0.16,0.16,'#1e88e5',0.15,0.1,0.0));
+      const boat = new THREE.Group();
+      boat.add(box(0.26,0.12,0.6,'#ffffff')); boat.add(box(0.27,0.04,0.61,'#e53935'));
+      boat.add(box(0.16,0.14,0.18,'#4fc3f7',0,0.12,-0.08));
+      boat.position.set(-0.15,-t.h-0.06,1.35); g.add(boat);
+      g.userData.anim = (dt,time)=>{ boat.position.y = -t.h-0.06+Math.sin(time*2+t.z)*0.025; boat.rotation.z=Math.sin(time*1.6)*0.05; };
+      break;}
+    case 'farm':{
+      if(t.variant==='terrace'){
+        g.add(box(0.96,0.06,0.48,'#a4c46a',0,0,-0.24));
+        g.add(box(0.96,0.14,0.48,'#8bb45a',0,0,0.24));
+        g.add(box(0.96,0.15,0.04,'#9e9e9e',0,0,0.02));
+        for(let i=0;i<4;i++){ g.add(box(0.1,0.08,0.1,'#558b2f',-0.36+i*0.24,0.14,0.24)); g.add(box(0.1,0.08,0.1,'#558b2f',-0.36+i*0.24,0.06,-0.24)); }
+      } else {
+        const gold = r%3===0;
+        g.add(box(0.95,0.05,0.95, gold?'#d4c45a':'#9ccc65'));
+        for(let i=0;i<4;i++) g.add(box(0.88,0.04,0.09, gold?'#c0a83c':'#6fa83f',0,0.05,-0.33+i*0.22));
+      }
+      break;}
+    case 'tree':{
+      const n = 2 + (r%2);
+      const greens = t.kind==='sand'? ['#2e6b3a','#386f3f'] : ['#2e7d32','#43a047','#388e3c'];
+      for(let i=0;i<n;i++){
+        const ox=(hash(t.x,t.z,i)-0.5)*0.55, oz=(hash(t.z,t.x,i+4)-0.5)*0.55, s=0.8+hash(t.x,i,t.z)*0.5;
+        g.add(cyl(0.03,0.04,0.14*s,5,'#6d4c41',ox,0,oz));
+        g.add(cone(0.17*s,0.42*s,6,greens[i%greens.length],ox,0.12*s,oz));
+      }
+      break;}
+    case 'tourism':{
+      if(t.variant==='themepark'){
+        g.add(box(0.96,0.03,0.96,'#ffe0b2'));
+        g.add(box(0.04,0.62,0.04,'#eceff1',-0.1,0,-0.12)); g.add(box(0.04,0.62,0.04,'#eceff1',-0.1,0,0.12));
+        const wheel = new THREE.Group(); wheel.position.set(-0.1,0.62,0);
+        const cols=['#ef5350','#ffca28','#42a5f5','#ab47bc','#66bb6a','#ff7043'];
+        for(let i=0;i<8;i++){ const a=i*Math.PI/4;
+          const sp=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.4,0.02),mat('#ffffff')); sp.rotation.x=a; sp.position.set(0,Math.cos(a)*0.2,Math.sin(a)*0.2); wheel.add(sp);
+          const cab=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,0.08),mat(cols[i%6])); cab.position.set(0,Math.cos(a)*0.4,Math.sin(a)*0.4); wheel.add(cab); }
+        g.add(wheel);
+        g.add(cone(0.15,0.25,6,'#e53935',0.3,0.03,0.28)); g.add(cone(0.12,0.2,6,'#1e88e5',0.3,0.03,-0.25));
+        g.userData.anim = (dt)=>{ wheel.rotation.x += dt*0.6; };
+      } else if(t.variant==='beach'){
+        const cols=['#ef5350','#ffca28','#42a5f5','#ab47bc'];
+        for(let i=0;i<4;i++){ const ox=-0.3+(i%2)*0.55, oz=-0.28+Math.floor(i/2)*0.5;
+          g.add(cyl(0.012,0.012,0.32,4,'#eeeeee',ox,0,oz)); g.add(cone(0.18,0.09,8,cols[i],ox,0.3,oz));
+          g.add(box(0.12,0.01,0.22,cols[(i+1)%4],ox+0.12,0,oz)); }
+        g.add(box(0.06,0.4,0.06,'#ffffff',0.38,0,0.38)); g.add(box(0.18,0.08,0.18,'#ff7043',0.38,0.4,0.38));
+      } else {
+        g.add(box(0.98,0.03,0.98,'#ffffff'));
+        g.add(box(0.42,0.26,0.34,'#8d6e63',-0.2,0.03,0.2));
+        const rf = cone(0.34,0.24,4,'#eceff1',-0.2,0.29,0.2); rf.rotation.y=Math.PI/4; g.add(rf);
+        g.add(box(0.04,0.75,0.04,'#455a64',0.3,0.03,-0.38)); g.add(box(0.04,0.75,0.04,'#455a64',0.3,0.03,0.38));
+        g.add(box(0.015,0.015,0.8,'#263238',0.3,0.76,0));
+        for(let i=0;i<3;i++) g.add(box(0.08,0.06,0.06,'#e53935',0.3,0.62,-0.25+i*0.25));
+        g.add(box(0.06,0.25,0.06,'#ff7043',0.1,0.03,-0.1));
+      }
+      break;}
+    case 'wind':{
+      g.add(cyl(0.03,0.055,1.25,6,'#fafafa'));
+      g.add(box(0.09,0.09,0.18,'#eeeeee',0,1.2,0));
+      const rotor = new THREE.Group(); rotor.position.set(0,1.25,0.11);
+      for(let i=0;i<3;i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.52,0.015),mat('#ffffff')); b.position.y=0.26; const p=new THREE.Group(); p.rotation.z=i*Math.PI*2/3; p.add(b); rotor.add(p); b.castShadow=true; }
+      g.add(rotor);
+      if(M.type==='coast'){ const sea=adjSea(M,t); g.rotation.y = sea? Math.atan2(sea.x-t.x,sea.z-t.z) : -Math.PI/2; }
+      g.userData.anim = (dt)=>{ rotor.rotation.z += dt*2.2; };
+      break;}
+  }
+  return g;
+}
+
+/* ---------------- 마을(맵) 상태 ---------------- */
+/* ---------------- 브라우저 저장 (localStorage, DB 없음) ---------------- */
+const STORE_VER = 1, STORE_MAX = 50*1024, MAX_LOGS = 60;
+const storeKey = type => `village3d:v${STORE_VER}:${type}`;
+const isNum = v => typeof v==='number' && isFinite(v);
+const store = {
+  ok: true,
+  probe(){
+    try{ const k='village3d:probe'; localStorage.setItem(k,'1'); localStorage.removeItem(k); this.ok = true; }
+    catch(e){ this.ok = false; }
+    return this.ok;
+  },
+  save(M){
+    try{
+      const data = {v:STORE_VER, type:M.type, year:M.year, pop:M.pop, money:M.money,
+        hist:M.hist.map(h=>({year:h.year,pop:h.pop})), logs:M.logs.slice(0,MAX_LOGS).map(l=>({year:l.year,text:l.text})),
+        hints:M.hints, done:M.done, roadIdx:M.roadIdx,
+        buildings:M.tiles.filter(t=>t.b).map(t=>({x:t.x,z:t.z,b:t.b,variant:t.variant}))};
+      let s = JSON.stringify(data);
+      // 크기 제한: 넘으면 오래된 기록부터 줄인다
+      for(const n of [30,10,0]){ if(new TextEncoder().encode(s).length <= STORE_MAX) break; data.logs = data.logs.slice(0,n); s = JSON.stringify(data); }
+      if(new TextEncoder().encode(s).length > STORE_MAX) throw new Error('too big');
+      localStorage.setItem(storeKey(M.type), s);
+      this.ok = true;
+    } catch(e){ this.ok = false; }
+    showSaveState();
+    return this.ok;
+  },
+  load(type){
+    try{
+      const s = localStorage.getItem(storeKey(type));
+      if(!s) return null;
+      const d = JSON.parse(s);
+      const valid = d && d.v===STORE_VER && d.type===type
+        && isNum(d.year) && d.year>=START_YEAR && d.year<=END_YEAR && (d.year-START_YEAR)%STEP===0
+        && isNum(d.pop) && isNum(d.money) && isNum(d.roadIdx)
+        && Array.isArray(d.hist) && d.hist.length>0 && d.hist.every(h=>h && isNum(h.year) && isNum(h.pop))
+        && Array.isArray(d.logs) && d.logs.every(l=>l && isNum(l.year) && typeof l.text==='string')
+        && Array.isArray(d.buildings) && d.buildings.every(b=>b && Number.isInteger(b.x) && Number.isInteger(b.z)
+             && b.x>=0 && b.z>=0 && b.x<N && b.z<N && typeof b.b==='string' && TOOLS[b.b] && b.b!=='look' && b.b!=='bulldoze')
+        && d.hints && typeof d.hints==='object' && d.done && typeof d.done==='object';
+      return valid ? d : null;
+    } catch(e){ return null; }
+  },
+  clear(type){
+    try{ localStorage.removeItem(storeKey(type)); return true; } catch(e){ return false; }
+  },
+};
+function showSaveState(){
+  const el = document.getElementById('s-save'); if(!el) return;
+  el.textContent = store.ok ? '💾 저장됨' : '⚠️ 저장 안 됨';
+  el.classList.toggle('warn', !store.ok);
+  el.title = store.ok ? '이 브라우저에 자동으로 저장돼요' : '이 브라우저에서는 저장할 수 없어요. 새로고침하면 처음으로 돌아가요.';
+}
+
+function makeMap(type, saved){
+  const M = {type, year:START_YEAR, pop:0, money:2000, env:100, jobs:0, housing:0, tiles:[], tileMeshes:[],
+             group:new THREE.Group(), hist:[], logs:[], hints:{}, done:{}, ready:false};
+  genTerrain(M); buildTerrain(M); makeRoadPlan(M);
+  if(saved){
+    // 건물 다시 짓기: 도로를 먼저 지어야 기차역·다리 방향이 맞는다 (M.ready=false → 애니메이션·힌트 없음)
+    const list = saved.buildings.slice().sort((a,b)=>(a.b==='road'?0:1)-(b.b==='road'?0:1));
+    for(const bd of list){
+      const t = get(M, bd.x, bd.z);
+      if(!t || t.b || (t.water && bd.b!=='road')) continue;
+      place(M, bd.b, t, {variant: bd.variant || null}, true);
+      t.bmesh.userData.shown = true;
+    }
+    Object.assign(M, {year:saved.year, pop:saved.pop, money:saved.money, roadIdx:saved.roadIdx,
+      hist:saved.hist.map(h=>({year:h.year,pop:h.pop})), logs:saved.logs.slice(0,MAX_LOGS).map(l=>({year:l.year,text:l.text})),
+      hints:{...saved.hints}, done:{...saved.done}});
+    const s = calc(M); M.jobs=s.jobs; M.housing=s.housing; M.env=s.env;
+    M.ready = true; M.restored = true;
+    scene.add(M.group);
+    return M;
+  }
+  scene.add(M.group);
+  for(const [tool,n] of START_PRESET[type]) autoPlace(M,tool,n);
+  const s = calc(M); M.pop = s.housing; M.jobs=s.jobs; M.housing=s.housing; M.env=s.env;
+  M.hist.push({year:M.year, pop:M.pop});
+  M.ready = true;
+  addLog(M, ERA[type][0]);
+  addLog(M, type==='coast' ? '👋 바닷가 작은 마을에서 시작해요. 왼쪽 도구를 골라 땅을 눌러 건물을 지어 보세요!' : '👋 골짜기의 작은 마을에서 시작해요. 땅 위에 마우스를 올리면 높이와 경사를 알 수 있어요!');
+  return M;
+}
+
+function calc(M){
+  const c = {road:0,house:0,farm:0,paddy:0,terrace:0,port:0,tree:0,shop:0,factory:0,apt:0,tourism:0,wind:0,
+             school:0,station:0,hospital:0,park:0,mart:0,office:0,stadium:0};
+  for(const t of M.tiles) if(t.b){ c[t.b]++; if(t.b==='farm') c[t.variant]++; }
+  const housing = c.house*5 + c.apt*30;
+  const jobs = c.paddy*3 + c.terrace*2 + c.port*12 + c.factory*25 + c.shop*10 + c.tourism*15 + c.wind*3
+             + c.school*8 + c.station*10 + c.hospital*15 + c.park*1 + c.mart*20 + c.office*40 + c.stadium*10;
+  const env = Math.round(Math.max(0, Math.min(100, 100 - c.factory*8 - c.port*2 - c.apt*1 - c.road*0.2 + c.tree*1.2 + c.wind*1
+             - c.office*1.5 - c.mart*1 - c.stadium*1 + c.park*5)));
+  return {c, housing, jobs, env};
+}
+
+function simulate(M){
+  const {c, housing, jobs, env} = calc(M);
+  let target = Math.min(housing, jobs*2 + 10);
+  M.outflow = false;
+  if(M.type==='mountain' && M.year>=1980 && M.year<2000 && c.tourism===0){ target *= 0.75; M.outflow = true; }
+  M.noSchool = M.pop>=80 && c.school===0; M.noHospital = M.pop>=200 && c.hospital===0;
+  if(M.noSchool) target *= 0.85;
+  if(M.noHospital) target *= 0.85;
+  if(c.station>0) target = Math.min(housing, target*1.1);
+  const grow = target > M.pop ? (env<40?0.3:0.65) : 0.5;
+  M.pop = Math.max(0, Math.round(M.pop + (target - M.pop)*grow));
+  const income = Math.round(M.pop*4 + c.port*80 + c.factory*120 + c.shop*60 + c.tourism*130*(env/100) + c.paddy*22 + c.terrace*14 + c.wind*50
+             + c.station*60 + c.hospital*30 + c.mart*90 + c.office*160 + c.stadium*120*(env/100));
+  const upkeep = Math.round(c.road*2 + c.apt*10 + c.factory*20 + c.school*10 + c.hospital*15 + c.park*3);
+  M.money += income - upkeep;
+  M.lastIncome = income - upkeep;
+  M.env = env; M.jobs = jobs; M.housing = housing;
+}
+
+function place(M, tool, t, r, free){
+  if(tool==='bulldoze'){
+    if(t.bmesh) M.group.remove(t.bmesh);
+    t.b=null; t.variant=null; t.bmesh=null;
+    if(!free) M.money -= r.cost;
+    return;
+  }
+  t.b = tool; t.variant = r.variant || null;
+  const g = buildMesh(M, tool, t);
+  g.position.set(wx(t.x), t.h, wz(t.z));
+  M.group.add(g); t.bmesh = g;
+  if(!free) M.money -= r.cost;
+  if(M.ready){ g.scale.setScalar(0.01); pops.push({g,k:0}); }
+  if(M.ready && r.hint && !M.hints[r.hint]){ M.hints[r.hint]=true; addLog(M, HINTS[r.hint]); if(M===cur()) toast(HINTS[r.hint], 3800); }
+}
+
+function autoPlace(M, tool, n){
+  if(tool==='road'){
+    let k=0;
+    while(k<n && M.roadIdx < M.roadPlan.length){
+      const t = M.roadPlan[M.roadIdx++]; const r = check(M,'road',t);
+      if(r.ok){ place(M,'road',t,r,true); k++; }
+    }
+    return;
+  }
+  for(let i=0;i<n;i++){
+    let best=null, bs=-1e9;
+    for(const t of M.tiles){
+      const r = check(M,tool,t); if(!r.ok) continue;
+      const d = Math.hypot(t.x-M.cx, t.z-M.cz), rnd = hash(t.x+i, t.z, M.year);
+      let s = -d + (adjRoad(M,t)?4:0) + rnd*1.5;
+      if(tool==='farm') s = -Math.abs(d-5) + rnd*2 - (adjRoad(M,t)?1:0);
+      if(tool==='tree') s = d*0.35 + slope(M,t)*1.5 + rnd*4 - (adjRoad(M,t)?3:0) + (M.type==='coast' && t.kind==='sand'?3:0);
+      if(tool==='tourism') s = (M.type==='mountain'? t.h*1.5 - d*0.3 : -Math.abs(t.z-M.cz)*0.4) + rnd;
+      if(tool==='wind') s = t.h*2 + rnd*3 + (t.kind==='sand'?2:0);
+      if(tool==='port') s = -Math.abs(t.z-M.cz) + rnd;
+      if(s>bs){ bs=s; best=[t,r]; }
+    }
+    if(!best) break;
+    place(M, tool, best[0], best[1], true);
+  }
+}
+
+function addLog(M, text){ M.logs.unshift({year:M.year, text}); if(M===cur()) renderLog(); }
+
+/* ---------------- 진행 ---------------- */
+const maps = {};
+let curType = 'coast';
+const cur = () => maps[curType];
+function loadOrMakeMap(type){
+  const saved = store.load(type);
+  if(saved){ try{ return makeMap(type, saved); } catch(e){ /* 깨진 저장은 무시하고 새로 시작 */ } }
+  return makeMap(type);
+}
+store.probe();
+maps.coast = loadOrMakeMap('coast');
+maps.mountain = loadOrMakeMap('mountain');
+maps.plain = loadOrMakeMap('plain');
+maps.mountain.group.visible = false; maps.plain.group.visible = false;
+
+function nextTurn(){
+  const M = cur();
+  if(M.year >= END_YEAR){ showEnd(); return; }
+  const before = M.pop;
+  simulate(M);
+  M.year += STEP;
+  const idx = (M.year-START_YEAR)/STEP;
+  addLog(M, ERA[M.type][idx]);
+  const d = M.pop - before;
+  addLog(M, `👪 인구 ${before} → ${M.pop}명 (${d>=0?'+':''}${d}) · 💰 5년 수입 ${M.lastIncome>=0?'+':''}${M.lastIncome}`);
+  if(M.outflow) addLog(M, '🧳 일자리가 적어 젊은 사람들이 도시로 떠나요. 관광지를 만들면 사람들이 머물러요.');
+  if(M.noSchool) addLog(M, HINTS.noSchool);
+  if(M.noHospital) addLog(M, HINTS.noHospital);
+  const unlocked = Object.entries(TOOLS).filter(([k,T])=>T.year===M.year).map(([k,T])=>toolIcon(M,k)+' '+toolName(M,k));
+  if(unlocked.length) addLog(M, '🔓 새로 지을 수 있어요: ' + unlocked.join(', '));
+  if(M.env < 40 && !M.hints.envLow){ M.hints.envLow = true; addLog(M, HINTS.envLow); }
+  else if(M.jobs*2 + 10 < M.housing) addLog(M, '💼 일자리가 부족해요! 상가·공장·항구·관광지를 지어 보세요.');
+  else if(M.housing <= M.pop+2) addLog(M, '🏠 살 집이 부족해요! 주택이나 아파트를 지어 보세요.');
+  M.hist.push({year:M.year, pop:M.pop});
+  updateUI();
+  store.save(M);
+  if(M.year >= END_YEAR){ stopAuto(); setTimeout(showEnd, 600); }
+}
+
+let autoTimer = null;
+function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } const b=document.getElementById('btn-auto'); b.textContent='▶ 자동 발전 보기'; b.classList.remove('playing'); }
+function startAuto(){
+  if(cur().year >= END_YEAR){ toast('이미 2030년이에요. ↺ 다시 시작을 눌러 보세요.'); return; }
+  const b=document.getElementById('btn-auto'); b.textContent='⏸ 멈추기'; b.classList.add('playing');
+  const step = () => {
+    const M = cur();
+    if(M.year >= END_YEAR){ stopAuto(); return; }
+    const plan = PLAN[M.type][M.year] || [];
+    for(const [tool,n] of plan) autoPlace(M, tool, n);
+    // 자동 모드에서 새로 지은 건물에도 팝 애니메이션
+    for(const t of M.tiles) if(t.bmesh && !t.bmesh.userData.shown){ t.bmesh.userData.shown=true; t.bmesh.scale.setScalar(0.01); pops.push({g:t.bmesh,k:0}); }
+    for(const [tool] of plan){ const k = autoHint(M,tool); if(k && !M.hints[k]){ M.hints[k]=true; addLog(M, HINTS[k]); } }
+    nextTurn();
+  };
+  step(); autoTimer = setInterval(step, 2200);
+}
+function autoHint(M, tool){
+  return {port:'port', factory: M.type==='coast'?'factoryCoast':M.type==='plain'?'factoryPlain':'factoryMountain', apt:'apt',
+          tourism: M.type==='coast'?'beach':M.type==='plain'?'themepark':'ski', wind: M.type==='coast'?'windCoast':M.type==='plain'?'windPlain':'windMountain',
+          school:'school', station:'station', hospital:'hospital', park:'park', mart:'mart', office:'office', stadium:'stadium',
+          tree: M.type==='coast'?'windbreak':M.type==='mountain'?'mountainForest':null, farm: M.type==='mountain'?'terrace':'paddy'}[tool];
+}
+
+/* ---------------- UI ---------------- */
+let tool = 'look';
+const $ = id => document.getElementById(id);
+function renderTools(){
+  const M = cur(); const el = $('tools'); el.innerHTML='';
+  let sep = false;
+  for(const [k,T] of Object.entries(TOOLS)){
+    if(T.group==='city' && !sep){ sep = true; const d=document.createElement('div'); d.className='tool sep'; d.textContent='🏙️ 도시 시설'; el.appendChild(d); }
+    const lock = M.year < T.year;
+    let name = toolName(M,k), icon = toolIcon(M,k), sub;
+    if(k==='port' && M.type!=='coast') sub = '바다 마을만';
+    sub = sub || (lock ? `🔒 ${T.year}년` : (k==='look'?'회전·확대':`💰 ${T.cost}`));
+    const b = document.createElement('button');
+    b.className = 'tool' + (tool===k?' on':'') + (lock?' lock':'');
+    b.innerHTML = `<span class="ic">${icon}</span><span>${name}<small>${sub}</small></span>`;
+    b.onclick = () => { tool = k; renderTools(); setControlMode(); };
+    el.appendChild(b);
+  }
+}
+function toolName(M,k){ return k==='tourism' ? ({coast:'해수욕장',mountain:'스키장',plain:'놀이공원'}[M.type]) : TOOLS[k].name; }
+function toolIcon(M,k){ return k==='tourism' ? ({coast:'🏖️',mountain:'⛷️',plain:'🎡'}[M.type]) : TOOLS[k].icon; }
+function setControlMode(){
+  const paint = TOOLS[tool].paint;
+  controls.mouseButtons.LEFT = (tool==='look') ? THREE.MOUSE.ROTATE : (paint ? -1 : THREE.MOUSE.ROTATE);
+  controls.touches.ONE = (tool==='look' || !paint) ? THREE.TOUCH.ROTATE : -1;
+  if(tool==='look') marker.visible = false;
+}
+function updateUI(){
+  const M = cur(); const s = calc(M);
+  M.jobs = s.jobs; M.housing = s.housing; M.env = s.env;
+  $('s-year').textContent = M.year + '년';
+  $('s-pop').textContent = M.pop;
+  $('s-money').textContent = M.money;
+  $('s-house').textContent = `${s.housing}명분`;
+  $('s-jobs').textContent = s.jobs;
+  $('s-env').textContent = s.env + (s.env>=70?' 😊':s.env>=40?' 😐':' 😷');
+  $('terrain-desc').innerHTML = TERRAIN_DESC[M.type];
+  $('era').textContent = ERA[M.type][(M.year-START_YEAR)/STEP];
+  const ul = $('missions'); ul.innerHTML='';
+  MISSIONS[M.type].forEach((m,i)=>{
+    const ok = M.done[i] || m.f(s.c, M);
+    if(ok && !M.done[i]){ M.done[i]=true; if(M.ready){ addLog(M, `🎉 미션 완료: ${m.t}`); toast(`🎉 미션 완료: ${m.t}`); } }
+    const li=document.createElement('li'); li.className = ok?'ok':''; li.textContent = (ok?'✅ ':'⬜ ')+m.t; ul.appendChild(li);
+  });
+  $('btn-next').textContent = M.year>=END_YEAR ? '🏁 결과 보기' : `⏩ 5년 지나기 (${M.year}→${M.year+STEP})`;
+  renderTools(); renderLog(); drawChart($('chart'), [maps.coast, maps.mountain, maps.plain], M);
+}
+const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderLog(){ $('log').innerHTML = cur().logs.slice(0,60).map(l=>`<div><b>${esc(l.year)}</b>${esc(l.text)}</div>`).join(''); }
+
+const COLORS = {coast:'#2f8fd8', mountain:'#4c9a4a', plain:'#d99a14'};
+const MNAME = {coast:'🌊 바다 마을', mountain:'⛰️ 산 마을', plain:'🌾 들 마을'};
+function drawChart(cv, list, focus){
+  const ctx = cv.getContext('2d'), W=cv.width, H=cv.height, p=34;
+  ctx.clearRect(0,0,W,H);
+  const maxP = Math.max(50, ...list.flatMap(M=>M.hist.map(h=>h.pop)));
+  ctx.strokeStyle='#dde5ea'; ctx.fillStyle='#789'; ctx.font='18px Noto Sans KR'; ctx.lineWidth=1;
+  for(let i=0;i<=2;i++){ const y=H-p-(H-2*p)*i/2; ctx.beginPath(); ctx.moveTo(p,y); ctx.lineTo(W-10,y); ctx.stroke(); ctx.fillText(Math.round(maxP*i/2),2,y+6); }
+  for(let yr=START_YEAR; yr<=END_YEAR; yr+=20){ const x=p+(W-p-10)*(yr-START_YEAR)/(END_YEAR-START_YEAR); ctx.fillText(yr, x-20, H-6); }
+  for(const M of list){
+    const col = COLORS[M.type];
+    ctx.strokeStyle = col; ctx.globalAlpha = (!focus || M===focus)?1:0.35; ctx.lineWidth = 4;
+    ctx.beginPath();
+    M.hist.forEach((h,i)=>{ const x=p+(W-p-10)*(h.year-START_YEAR)/(END_YEAR-START_YEAR), y=H-p-(H-2*p)*h.pop/maxP; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.stroke();
+    const last = M.hist[M.hist.length-1]; const x=p+(W-p-10)*(last.year-START_YEAR)/(END_YEAR-START_YEAR), y=H-p-(H-2*p)*last.pop/maxP;
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,6,0,7); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  [['coast','● 바다'],['mountain','● 산'],['plain','● 들']].forEach(([k,n],i)=>{ ctx.fillStyle=COLORS[k]; ctx.fillText(n, W-200+i*66, 22); });
+}
+
+let toastT;
+function toast(msg, ms=2200){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), ms); }
+
+function switchMap(type){
+  stopAuto(); curType = type;
+  for(const k in maps){ maps[k].group.visible = k===type; $('tab-'+k).classList.toggle('on', k===type); }
+  scene.background.set({coast:'#bfe6ff',mountain:'#cfe7f5',plain:'#d4ecfa'}[type]); scene.fog.color.copy(scene.background);
+  updateUI();
+}
+
+function compareHTML(){
+  const rows = [['📅 연도','year'],['👪 인구','pop'],['💼 일자리','jobs'],['🌿 환경 점수','env'],['💰 예산','money']];
+  const L = [maps.coast, maps.mountain, maps.plain], C = L.map(M=>calc(M).c);
+  const bl = [['🛣️ 도로','road'],['🏠 주택','house'],['🏢 아파트','apt'],['🌾 논','paddy'],['⛰️ 계단식 밭','terrace'],['⚓ 항구','port'],['🏪 상가','shop'],['🏭 공장','factory'],['🎡 관광지','tourism'],['🌬️ 풍력','wind'],['🌲 숲','tree'],
+    ['🏫 학교','school'],['🚉 기차역','station'],['🏥 병원','hospital'],['⛲ 공원','park'],['🛒 대형마트','mart'],['🏙️ 고층빌딩','office'],['🏟️ 경기장','stadium']];
+  return `<h2>⚖️ 바다 마을 · 산 마을 · 들 마을 비교</h2>
+  <canvas id="cmp-chart" width="660" height="220" style="width:100%;background:#f7fafc;border-radius:8px"></canvas>
+  <table><tr><th></th>${L.map(M=>`<th>${MNAME[M.type]}</th>`).join('')}</tr>
+  ${rows.map(([n,k])=>`<tr><td>${n}</td>${L.map(M=>`<td>${M[k]}</td>`).join('')}</tr>`).join('')}
+  ${bl.map(([n,k])=>`<tr><td>${n}</td>${C.map(c=>`<td>${c[k]}</td>`).join('')}</tr>`).join('')}
+  </table>
+  <h2 style="font-size:18px;margin-top:14px">🤔 생각해 볼까요?</h2>
+  <ol>
+    <li>세 마을에서 가장 많이 지은 건물은 각각 무엇인가요? 왜 그럴까요?</li>
+    <li>바다 마을에만 있는 것, 산 마을에만 있는 것은 무엇인가요? 그 까닭은?</li>
+    <li>들 마을에 학교·병원·고층빌딩 같은 도시 시설이 많이 생길 수 있었던 까닭은 무엇인가요?</li>
+    <li>산 마을에서 건물을 짓기 어려웠던 까닭은 무엇인가요?</li>
+    <li>세 마을의 인구는 어떻게 다르게 변했나요? 그래프를 보고 말해 보세요.</li>
+    <li>자연을 지키면서 마을을 발전시키려면 어떻게 해야 할까요?</li>
+  </ol>`;
+}
+function showCompare(){
+  $('modal-body').innerHTML = compareHTML(); $('modal').hidden = false;
+  drawChart($('cmp-chart'), [maps.coast, maps.mountain, maps.plain], null);
+}
+function showEnd(){
+  const M = cur();
+  const s = calc(M);
+  const doneN = MISSIONS[M.type].filter((m,i)=>M.done[i]).length;
+  $('modal-body').innerHTML = `<h2>🏁 ${MNAME[M.type]}의 2030년</h2>
+   <p style="font-size:15px;line-height:1.7">60년 동안 마을 인구는 <b>${M.hist[0].pop}명</b>에서 <b>${M.pop}명</b>이 되었어요.<br>
+   일자리 <b>${s.jobs}개</b>, 환경 점수 <b>${s.env}점</b>, 미션 <b>${doneN}/5</b>개 완료!</p>
+   <p style="font-size:14px">다른 마을도 키워 본 뒤 <b>⚖️ 마을 비교</b>를 눌러 차이를 살펴보세요.</p>` ;
+  $('modal').hidden = false;
+}
+
+$('tab-coast').onclick = () => switchMap('coast');
+$('tab-mountain').onclick = () => switchMap('mountain');
+$('tab-plain').onclick = () => switchMap('plain');
+$('btn-next').onclick = () => { stopAuto(); nextTurn(); };
+$('btn-auto').onclick = () => autoTimer ? stopAuto() : startAuto();
+$('btn-compare').onclick = () => { stopAuto(); showCompare(); };
+function closeModal(){ $('modal').hidden = true; $('modal-close').hidden = false; }
+function showConfirm(html, yesLabel, onYes){
+  $('modal-body').innerHTML = html +
+    `<div class="confirm-btns"><button id="confirm-yes">${yesLabel}</button><button id="confirm-no">아니요</button></div>`;
+  $('modal-close').hidden = true; $('modal').hidden = false;
+  $('confirm-yes').onclick = () => { closeModal(); onYes(); };
+  $('confirm-no').onclick = closeModal;
+}
+$('btn-reset').onclick = () => {
+  stopAuto();
+  const type = curType;
+  showConfirm(`<h2>↺ 정말 처음부터 다시 할까요?</h2>
+    <p style="font-size:15px;line-height:1.7"><b>${MNAME[type]}</b>을 1970년으로 되돌리고, 이 마을의 저장 기록을 지워요.<br>다른 두 마을은 그대로 남아요.</p>`,
+    '네, 다시 시작', () => {
+      store.clear(type);
+      const old = maps[type]; scene.remove(old.group);
+      maps[type] = makeMap(type); switchMap(type);
+      toast('처음 1970년으로 돌아갔어요');
+    });
+};
+$('modal-close').onclick = closeModal;
+$('modal').onclick = e => { if(e.target.id==='modal') closeModal(); };
+$('panel-toggle').onclick = () => $('panel').classList.toggle('open');
+
+/* ---------------- 마우스/터치 ---------------- */
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+const marker = new THREE.Mesh(new THREE.BoxGeometry(1.02,0.08,1.02), new THREE.MeshBasicMaterial({color:'#00e676',transparent:true,opacity:0.45,depthWrite:false}));
+marker.visible = false; scene.add(marker);
+let hover = null, downPos = null, painting = false, lastPaint = null;
+const tip = $('tip');
+
+function pick(e){
+  const r = canvas.getBoundingClientRect();
+  mouse.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(cur().tileMeshes, false)[0];
+  return hit ? hit.object.userData.tile : null;
+}
+function terrainName(M,t){
+  if(t.kind==='sea') return '🌊 바다'; if(t.kind==='river') return '🏞️ 강';
+  if(t.kind==='sand') return '🏖️ 모래사장(해안)'; if(t.kind==='snow') return '🏔️ 눈 덮인 봉우리'; if(t.kind==='rock') return '🪨 바위산';
+  const s = slope(M,t); return s<=0.25?'🟩 평지': s<=0.75?'⛰️ 완만한 비탈':'⛰️ 가파른 비탈';
+}
+const BNAME = t => !t.b ? '' : t.b==='farm' ? (t.variant==='terrace'?'계단식 밭':'논') : t.b==='tourism' ? ({beach:'해수욕장',ski:'스키장',themepark:'놀이공원'}[t.variant]) : (t.b==='road'&&t.water) ? '다리' : TOOLS[t.b].name;
+
+function showTip(e, t){
+  const M = cur();
+  if(!t){ tip.style.display='none'; marker.visible=false; return; }
+  let html = `<b>${terrainName(M,t)}</b>`;
+  if(!t.water) html += `<br>해발 ${Math.round(t.h*80)}m · 경사 ${slope(M,t)<=0.25?'평평함':slope(M,t)<=0.75?'약간 비탈':'가파름'}`;
+  if(t.b) html += `<br>🏗️ ${BNAME(t)}`;
+  marker.position.set(wx(t.x), Math.max(t.h, -0.08)+0.06+(t.b==='apt'?0:0), wz(t.z));
+  if(tool!=='look'){
+    const r = check(M, tool, t);
+    const enough = r.ok && M.money >= r.cost;
+    html += r.ok ? `<br>${enough?'✅':'💸'} ${r.msg?r.msg+' · ':''}비용 ${r.cost}${enough?'':' (예산 부족)'}` : (r.msg?`<br>❌ ${r.msg}`:'');
+    marker.material.color.set(enough ? '#00e676' : '#ff5252');
+    marker.visible = true;
+  } else marker.visible = false;
+  tip.innerHTML = html; tip.style.display='block';
+  tip.style.left = Math.min(innerWidth-250, e.clientX+16)+'px'; tip.style.top = (e.clientY+16)+'px';
+}
+
+function tryBuild(t, quiet){
+  const M = cur(); if(!t || tool==='look') return;
+  const r = check(M, tool, t);
+  if(!r.ok){ if(!quiet && r.msg) toast('❌ '+r.msg); return; }
+  if(M.money < r.cost){ if(!quiet) toast('💸 예산이 부족해요! 5년을 지나 세금을 모아 보세요.'); return; }
+  place(M, tool, t, r, false);
+  updateUI();
+  if(painting) paintDirty = true; else store.save(M);
+}
+let paintDirty = false;
+function endPaint(){ painting = false; if(paintDirty){ paintDirty = false; store.save(cur()); } }
+
+canvas.addEventListener('pointerdown', e => {
+  downPos = {x:e.clientX, y:e.clientY};
+  if(e.button===0 && TOOLS[tool].paint){ painting = true; const t=pick(e); lastPaint=t; tryBuild(t,false); }
+});
+canvas.addEventListener('pointermove', e => {
+  const t = pick(e); hover = t; showTip(e, t);
+  if(painting && t && t!==lastPaint){ lastPaint=t; tryBuild(t,true); }
+});
+canvas.addEventListener('pointerup', e => {
+  if(!painting && downPos && Math.hypot(e.clientX-downPos.x, e.clientY-downPos.y) < 6 && e.button===0) tryBuild(pick(e), false);
+  endPaint(); downPos = null;
+});
+canvas.addEventListener('pointerleave', () => { tip.style.display='none'; marker.visible=false; endPaint(); });
+canvas.addEventListener('pointercancel', () => endPaint());
+
+/* ---------------- 렌더 루프 ---------------- */
+const pops = [];
+function resize(){ document.documentElement.style.setProperty('--top-h', (document.getElementById('top').offsetHeight+20)+'px'); renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+// 글꼴 로딩·저장 표시 변경으로 위쪽 바가 두 줄이 되어도 도구 상자·정보 패널이 가려지지 않게
+const fitTop = () => document.documentElement.style.setProperty('--top-h', (document.getElementById('top').offsetHeight+20)+'px');
+if(window.ResizeObserver) new ResizeObserver(fitTop).observe(document.getElementById('top'));
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitTop);
+
+const clock = new THREE.Clock();
+function loop(){
+  const dt = Math.min(clock.getDelta(), 0.05), time = clock.elapsedTime;
+  controls.update();
+  const M = cur();
+  for(const ch of M.group.children) ch.userData.anim && ch.userData.anim(dt, time);
+  for(let i=pops.length-1;i>=0;i--){ const p=pops[i]; p.k=Math.min(1,p.k+dt*4); const s=p.k<1? (1-Math.pow(1-p.k,3))*1.08 : 1; p.g.scale.setScalar(Math.max(0.01,s)); if(p.k>=1){ p.g.scale.setScalar(1); pops.splice(i,1);} }
+  // 물결
+  const pos = M.water.geometry.attributes.position;
+  for(let i=0;i<pos.count;i++){ const x=pos.getX(i), z=pos.getZ(i); pos.setY(i, Math.sin(x*1.3+time*1.5)*0.03 + Math.cos(z*1.1+time*1.2)*0.03); }
+  pos.needsUpdate = true; M.water.geometry.computeVertexNormals();
+  for(const c of clouds){ c.position.x += dt*0.4; if(c.position.x>24) c.position.x=-24; }
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+setControlMode(); switchMap('coast'); loop();
+if(!store.ok) showSaveState();
+else { const el=$('s-save'); el.textContent='💾 자동 저장'; el.title='건물을 짓거나 5년이 지날 때마다 이 브라우저에 저장돼요'; }
+if(Object.values(maps).some(M=>M.restored)) toast('💾 지난번 마을을 불러왔어요', 3200);
+</script>
+</body>
+</html>

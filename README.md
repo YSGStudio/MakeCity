@@ -16,9 +16,10 @@
 ## 로컬에서 실행
 
 ```bash
-python3 -m http.server 8000 -d public
-# 브라우저에서 http://localhost:8000 접속
+npm run dev        # 또는 python3 -m http.server 8000 -d public
+# 브라우저에서 http://localhost:8000 접속 (끄려면 Ctrl+C)
 ```
+설치할 라이브러리가 없어 `npm install`은 하지 않아도 됩니다.
 
 ## 배포 (GitHub → Vercel)
 

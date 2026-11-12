@@ -1,0 +1,10 @@
+{
+  "name": "makecity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "우리 마을 가꾸기 3D - 초등 사회 수업용 마을 만들기 게임 (빌드 없음, public/index.html 하나로 동작)",
+  "scripts": {
+    "dev": "python3 -m http.server 8000 -d public",
+    "start": "python3 -m http.server 8000 -d public"
+  }
+}

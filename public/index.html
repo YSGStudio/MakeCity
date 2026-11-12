@@ -144,8 +144,20 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* ---------------- 기본 설정 ---------------- */
-const N = 20, START_YEAR = 1970, END_YEAR = 2030, STEP = 5;
+const N = 24, START_YEAR = 1970, END_YEAR = 2030, STEP = 5;
 const wx = x => x - N/2 + 0.5, wz = z => z - N/2 + 0.5;
+const SC = N/20;   // 20×20 기준으로 만든 카메라·조명 값을 지도 크기에 맞추는 비율
+
+/* 건물이 차지하는 칸 수 [가로, 세로]. 실제 크기에 비례: 작은 건물 1칸, 큰 시설일수록 넓게 */
+const FOOT = {port:[1,2], apt:[1,2], station:[1,3],
+              factory:[2,2], school:[2,2], hospital:[2,2], mart:[2,2], office:[2,2], park:[2,2],
+              stadium:[3,3]};
+const TOURISM_FOOT = {coast:[1,3], mountain:[2,2], plain:[3,3]};   // 해수욕장 · 스키장 · 놀이공원
+const footSize = (M, tool) => tool==='tourism' ? TOURISM_FOOT[M.type] : (FOOT[tool] || [1,1]);
+// 칸마다 모델을 하나씩 놓는 시설(비탈·해안선을 따라 놓임). 나머지 큰 건물은 모델 하나를 늘려서 그림
+const TILED = b => b==='port' || b==='park' || b==='tourism-beach' || b==='tourism-ski';
+// 큰 건물을 늘릴 때의 높이 배율
+const SY = {apt:1, station:1, factory:1.3, school:1.3, hospital:1.6, mart:1.2, office:1.5, stadium:1.5, 'tourism-themepark':2.2};
 
 function hash(x,z,s){ const v=Math.sin(x*127.1+z*311.7+s*74.7)*43758.5453; return v-Math.floor(v); }
 function noise(x,z,s){
@@ -166,21 +178,21 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#bfe6ff');
-scene.fog = new THREE.Fog('#bfe6ff', 45, 80);
+scene.fog = new THREE.Fog('#bfe6ff', 45*SC, 80*SC);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-camera.position.set(17, 21, 21);
+camera.position.set(17*SC, 21*SC, 21*SC);
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 0, 0);
 controls.enableDamping = true;
 controls.maxPolarAngle = 1.32;
-controls.minDistance = 8; controls.maxDistance = 45;
+controls.minDistance = 8; controls.maxDistance = 45*SC;
 
 scene.add(new THREE.HemisphereLight('#ffffff', '#7a9a6a', 1.1));
 const sun = new THREE.DirectionalLight('#fff4dd', 1.8);
-sun.position.set(12, 22, 8);
+sun.position.set(12*SC, 22*SC, 8*SC);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048,2048);
-Object.assign(sun.shadow.camera, {left:-16,right:16,top:16,bottom:-16,near:1,far:60});
+Object.assign(sun.shadow.camera, {left:-16*SC,right:16*SC,top:16*SC,bottom:-16*SC,near:1,far:60*SC});
 sun.shadow.bias = -0.0008;
 scene.add(sun);
 
@@ -210,7 +222,7 @@ for(let i=0;i<6;i++){
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8+hash(i,j,9)*0.6,0), mat('#ffffff'));
     m.position.set(j*0.9-0.9, hash(i,j,3)*0.4, hash(j,i,4)*0.6); g.add(m);
   }
-  g.position.set(-20+i*7, 12+hash(i,1,2)*3, -14+hash(i,2,1)*10); g.scale.setScalar(0.7);
+  g.position.set((-20+i*7)*SC, 12+hash(i,1,2)*3, (-14+hash(i,2,1)*10)*SC); g.scale.setScalar(0.7);
   scene.add(g); clouds.push(g);
 }
 
@@ -360,7 +372,7 @@ const PLAN = {
     2010:[['wind',2],['park',2],['hospital',1],['apt',3]],2015:[['road',8],['office',3],['apt',4],['park',1]],
     2020:[['apt',4],['office',2],['tree',5],['mart',1]],2025:[['park',2],['apt',3],['office',2]]},
   coast:{1970:[['road',6],['house',3],['farm',3]],1975:[['house',4],['farm',3],['port',1]],1980:[['road',8],['factory',2],['shop',2]],
-    1985:[['house',6],['shop',1],['port',1]],1990:[['apt',3],['tourism',1]],1995:[['road',6],['apt',2],['shop',2]],2000:[['tree',8],['tourism',1]],
+    1985:[['house',6],['shop',1],['port',1]],1990:[['apt',3],['tourism',1]],1995:[['road',6],['apt',2],['shop',2]],2000:[['tourism',1],['tree',8]],
     2005:[['apt',2],['shop',2]],2010:[['wind',3],['tree',3]],2015:[['apt',2],['tourism',1]],2020:[['wind',2],['tree',4]],2025:[['apt',1],['shop',1]]},
   mountain:{1970:[['road',4],['house',2],['farm',4]],1975:[['farm',3],['house',2]],1980:[['road',10],['shop',1],['factory',1]],
     1985:[['house',2]],1990:[['road',6],['tourism',1],['house',3],['shop',1]],1995:[['farm',3],['apt',1]],2000:[['tree',12]],
@@ -375,20 +387,20 @@ function genTerrain(M){
       const d = x + Math.sin(z*0.55)*1.3 + (noise(x*0.4,z*0.4,1)-0.5)*1.5;
       if(d<5){ h=-0.5; kind='sea'; }
       else if(d<6.6){ h=0.25; kind='sand'; }
-      else { h=q(0.5 + Math.max(0,d-13)*0.32 + noise(x*0.3,z*0.3,2)*0.4); kind = h>=2.25?'rock':'grass'; }
+      else { h=q(0.5 + Math.max(0,d-(N-7))*0.32 + noise(x*0.3,z*0.3,2)*0.4); kind = h>=2.25?'rock':'grass'; }
     } else if(M.type==='plain'){
       const rz = riverZ(x);
       if(Math.abs(z-rz)<0.85){ h=-0.3; kind='river'; }
-      else { h = q(0.5 + noise(x*0.3,z*0.3,6)*0.3 + Math.max(0,x+z-29)*0.3); kind = h>=2.25?'rock':'grass'; }
+      else { h = q(0.5 + noise(x*0.3,z*0.3,6)*0.3 + Math.max(0,x+z-(2*N-11))*0.3); kind = h>=2.25?'rock':'grass'; }
     } else {
       const dz = Math.abs(z - valleyC(x));
       if(dz<0.9){ h=-0.3; kind='river'; }
       else {
-        h = q(0.5 + Math.max(0,dz-1.5)*0.3 + noise(x*0.35,z*0.35,3)*(dz>3?0.9:0.25));
+        h = q(0.5 + Math.max(0,dz-1.5)*0.3/SC + noise(x*0.35,z*0.35,3)*(dz>3?0.9:0.25));   // 지도가 넓어져도 산 높이는 그대로
         kind = h>=3.5?'snow':h>=2.5?'rock':'grass';
       }
     }
-    M.tiles.push({x,z,h,kind,water:kind==='sea'||kind==='river',b:null,variant:null,bmesh:null});
+    M.tiles.push({x,z,h,kind,water:kind==='sea'||kind==='river',b:null,variant:null,bld:null});
   }
 }
 const get = (M,x,z) => (x<0||z<0||x>=N||z>=N)? null : M.tiles[x*N+z];
@@ -427,18 +439,21 @@ function makeRoadPlan(M){
   if(M.type==='coast'){
     const roadX = z => { for(let x=0;x<N;x++){ const t=get(M,x,z); if(t.kind==='grass') return x+1; } return 8; };
     const main = []; for(let z=0;z<N;z++) main.push(get(M,roadX(z),z));
-    main.sort((a,b)=>Math.abs(a.z-10)-Math.abs(b.z-10));
+    const zc = N/2;
+    main.sort((a,b)=>Math.abs(a.z-zc)-Math.abs(b.z-zc));
     plan.push(...main);
-    const x0 = roadX(10); for(let x=x0+1;x<17;x++) plan.push(get(M,x,10));
-    for(let z=4;z<N-3;z++) if(z!==10) plan.push(get(M,x0+6,z));
-    M.cx = x0+3; M.cz = 10;
+    const x0 = roadX(zc); for(let x=x0+1;x<N-3;x++) plan.push(get(M,x,zc));
+    for(let z=4;z<N-3;z++) if(z!==zc) plan.push(get(M,x0+6,z));
+    M.cx = x0+3; M.cz = zc;
   } else if(M.type==='plain'){
     const cand = [];
-    for(const z of [9,13,17]) for(let x=1;x<N-1;x++) cand.push(get(M,x,z));
-    for(const x of [3,7,11,15]) for(let z=1;z<N-1;z++) if(![9,13,17].includes(z)) cand.push(get(M,x,z));
-    cand.sort((a,b)=>Math.hypot(a.x-10,a.z-12)-Math.hypot(b.x-10,b.z-12));
+    // 도로 사이 블록을 4칸 폭으로 두어 2×2·3×3 건물이 들어갈 수 있게
+    const rows = [9,14,19], cols = [3,8,13,18];
+    for(const z of rows) for(let x=1;x<N-1;x++) cand.push(get(M,x,z));
+    for(const x of cols) for(let z=1;z<N-1;z++) if(!rows.includes(z)) cand.push(get(M,x,z));
+    cand.sort((a,b)=>Math.hypot(a.x-12,a.z-14)-Math.hypot(b.x-12,b.z-14));
     plan.push(...cand);
-    M.cx = 10; M.cz = 12;
+    M.cx = 12; M.cz = 14;
   } else {
     const main = [];
     for(let x=0;x<N;x++){
@@ -446,26 +461,28 @@ function makeRoadPlan(M){
       for(let z=c+1;z<=c+3;z++){ const t=get(M,x,z); if(t && !t.water && (!best || t.h<best.h)) best=t; }
       if(best) main.push(best);
     }
-    main.sort((a,b)=>Math.abs(a.x-10)-Math.abs(b.x-10));
+    const xm = N/2;
+    main.sort((a,b)=>Math.abs(a.x-xm)-Math.abs(b.x-xm));
     plan.push(...main);
     // 반대편으로 건너는 다리 겸 도로, 산으로 오르는 길
-    const c10 = Math.round(valleyC(10));
-    for(let z=c10+3; z<N; z++) plan.push(get(M,10,z));
-    for(let z=c10-2; z>=0; z--) plan.push(get(M,10,z));
-    M.cx = 10; M.cz = c10+2;
+    const c10 = Math.round(valleyC(xm));
+    for(let z=c10+3; z<N; z++) plan.push(get(M,xm,z));
+    for(let z=c10-2; z>=0; z--) plan.push(get(M,xm,z));
+    M.cx = xm; M.cz = c10+2;
   }
   M.roadPlan = plan.filter(Boolean); M.roadIdx = 0;
 }
 
 /* ---------------- 건설 규칙 ---------------- */
-function check(M, tool, t){
-  const T = TOOLS[tool], s = slope(M,t);
+function check(M, tool, t, o){
+  // o.s / o.road: 여러 칸 건물일 때 건물 전체 기준의 경사·도로 접함을 넘겨받음
+  const T = TOOLS[tool], s = (o && o.s!=null) ? o.s : slope(M,t);
   if(tool==='look') return {ok:false, msg:''};
   if(M.year < T.year) return {ok:false, msg:`🔒 ${T.year}년부터 지을 수 있어요`};
   if(tool==='bulldoze') return t.b ? {ok:true,cost:T.cost} : {ok:false,msg:'철거할 것이 없어요'};
   if(t.water && !(tool==='road' && t.kind==='river')) return {ok:false, msg: t.kind==='sea'?'바다 위에는 지을 수 없어요':'강 위에는 지을 수 없어요 (도로는 다리로 놓을 수 있어요)'};
   if(t.b) return {ok:false, msg:'이미 무언가 있어요 (철거 먼저)'};
-  const road = adjRoad(M,t);
+  const road = (o && o.road!=null) ? o.road : adjRoad(M,t);
   const R = (extra) => Object.assign({ok:true,cost:T.cost}, extra||{});
   const F = (msg) => ({ok:false,msg});
   switch(tool){
@@ -523,9 +540,52 @@ function check(M, tool, t){
   return F('');
 }
 
+/* ---------------- 여러 칸 건물: 자리 검사·자리 고르기 ---------------- */
+// (ax,az)에서 시작하는 w×d 자리에 지을 수 있는지. 모든 칸이 조건을 만족해야 함
+function footCheck(M, tool, ax, az, w, d){
+  const tiles = [];
+  for(let i=0;i<w;i++) for(let j=0;j<d;j++){ const t = get(M, ax+i, az+j); if(!t) return null; tiles.push(t); }
+  const base = {tiles, ax, az, w, d};
+  if(tiles.length===1) return Object.assign(check(M, tool, tiles[0]), base);
+  const land = tiles.filter(t=>!t.water);
+  const s = land.length ? Math.max(...land.map(t=>t.h)) - Math.min(...land.map(t=>t.h)) : 0;   // 자리 안의 높이 차
+  const road = tiles.some(t => nbrs(M,t).some(n => n.b==='road' && !tiles.includes(n)));
+  let first = null;
+  for(const t of tiles){
+    const r = check(M, tool, t, {s, road});
+    if(!r.ok) return Object.assign(r, base);
+    first = first || r;
+  }
+  return Object.assign(first, base, {road});
+}
+// 마우스가 가리키는 칸(t)을 포함하는 자리 중 지을 수 있는 곳을 고름. 가운데에 가까운 자리, 긴 건물은 두 방향 모두 시도
+function choosePlace(M, tool, t){
+  if(tool==='bulldoze'){
+    const T = TOOLS.bulldoze;
+    if(M.year < T.year) return {ok:false, msg:''};
+    return t.bld ? {ok:true, cost:T.cost, tiles:t.bld.tiles, ax:t.bld.x, az:t.bld.z, w:t.bld.w, d:t.bld.d, bld:t.bld}
+                 : {ok:false, msg:'철거할 것이 없어요', tiles:[t], ax:t.x, az:t.z, w:1, d:1};
+  }
+  const [w0, d0] = footSize(M, tool);
+  const orients = w0===d0 ? [[w0,d0]] : [[w0,d0],[d0,w0]];
+  const cands = [];
+  for(const [w,d] of orients) for(let ax=t.x-w+1; ax<=t.x; ax++) for(let az=t.z-d+1; az<=t.z; az++)
+    cands.push({ax, az, w, d, dist: Math.hypot(ax+(w-1)/2-t.x, az+(d-1)/2-t.z)});
+  cands.sort((a,b)=>a.dist-b.dist);
+  let fallback = null;
+  for(const c of cands){
+    const r = footCheck(M, tool, c.ax, c.az, c.w, c.d);
+    if(!r) continue;
+    if(r.ok) return r;
+    fallback = fallback || r;
+  }
+  return fallback || {ok:false, msg:`${toolName(M,tool)}을(를) 놓을 공간이 부족해요 (${w0}×${d0}칸)`, tiles:[t], ax:t.x, az:t.z, w:1, d:1};
+}
+
 /* ---------------- 건물 모델 ---------------- */
 const smokeMat = new THREE.MeshStandardMaterial({color:'#cfd8dc',transparent:true,opacity:0.55,flatShading:true});
-function buildMesh(M, tool, t){
+function buildMesh(M, tool, t, part=0){
+  // part: 여러 칸 시설에서 몇 번째 칸인지(0 = 대표 칸)
   const g = new THREE.Group(); const r = Math.floor(hash(t.x,t.z,11)*16);
   switch(tool){
     case 'road':{
@@ -675,6 +735,12 @@ function buildMesh(M, tool, t){
           g.add(cyl(0.012,0.012,0.32,4,'#eeeeee',ox,0,oz)); g.add(cone(0.18,0.09,8,cols[i],ox,0.3,oz));
           g.add(box(0.12,0.01,0.22,cols[(i+1)%4],ox+0.12,0,oz)); }
         g.add(box(0.06,0.4,0.06,'#ffffff',0.38,0,0.38)); g.add(box(0.18,0.08,0.18,'#ff7043',0.38,0.4,0.38));
+      } else if(part>0){
+        // 스키장의 나머지 칸: 눈 덮인 슬로프와 리프트 기둥
+        g.add(box(0.98,0.03,0.98,'#ffffff'));
+        g.add(box(0.04,0.75,0.04,'#455a64',0.3,0.03,0));
+        g.add(box(0.08,0.06,0.06,'#e53935',0.3,0.62,(part%2?-0.2:0.2)));
+        if(part%2) g.add(cone(0.12,0.3,6,'#2e7d32',-0.3,0.03,0.3));
       } else {
         g.add(box(0.98,0.03,0.98,'#ffffff'));
         g.add(box(0.42,0.26,0.34,'#8d6e63',-0.2,0.03,0.2));
@@ -700,7 +766,8 @@ function buildMesh(M, tool, t){
 
 /* ---------------- 마을(맵) 상태 ---------------- */
 /* ---------------- 브라우저 저장 (localStorage, DB 없음) ---------------- */
-const STORE_VER = 1, STORE_MAX = 50*1024, MAX_LOGS = 60;
+// v2: 지도 24×24 + 여러 칸 건물(x,z,w,d). v1(20×20) 저장은 맞지 않아 쓰지 않음
+const STORE_VER = 2, STORE_MAX = 50*1024, MAX_LOGS = 60;
 const storeKey = type => `village3d:v${STORE_VER}:${type}`;
 const isNum = v => typeof v==='number' && isFinite(v);
 const store = {
@@ -715,7 +782,7 @@ const store = {
       const data = {v:STORE_VER, type:M.type, year:M.year, pop:M.pop, money:M.money,
         hist:M.hist.map(h=>({year:h.year,pop:h.pop})), logs:M.logs.slice(0,MAX_LOGS).map(l=>({year:l.year,text:l.text})),
         hints:M.hints, done:M.done, roadIdx:M.roadIdx,
-        buildings:M.tiles.filter(t=>t.b).map(t=>({x:t.x,z:t.z,b:t.b,variant:t.variant}))};
+        buildings:M.blds.map(B=>({x:B.x,z:B.z,w:B.w,d:B.d,b:B.b,variant:B.variant}))};
       let s = JSON.stringify(data);
       // 크기 제한: 넘으면 오래된 기록부터 줄인다
       for(const n of [30,10,0]){ if(new TextEncoder().encode(s).length <= STORE_MAX) break; data.logs = data.logs.slice(0,n); s = JSON.stringify(data); }
@@ -737,7 +804,8 @@ const store = {
         && Array.isArray(d.hist) && d.hist.length>0 && d.hist.every(h=>h && isNum(h.year) && isNum(h.pop))
         && Array.isArray(d.logs) && d.logs.every(l=>l && isNum(l.year) && typeof l.text==='string')
         && Array.isArray(d.buildings) && d.buildings.every(b=>b && Number.isInteger(b.x) && Number.isInteger(b.z)
-             && b.x>=0 && b.z>=0 && b.x<N && b.z<N && typeof b.b==='string' && TOOLS[b.b] && b.b!=='look' && b.b!=='bulldoze')
+             && Number.isInteger(b.w) && Number.isInteger(b.d) && b.w>=1 && b.d>=1 && b.w<=3 && b.d<=3
+             && b.x>=0 && b.z>=0 && b.x+b.w<=N && b.z+b.d<=N && typeof b.b==='string' && TOOLS[b.b] && b.b!=='look' && b.b!=='bulldoze')
         && d.hints && typeof d.hints==='object' && d.done && typeof d.done==='object';
       return valid ? d : null;
     } catch(e){ return null; }
@@ -755,16 +823,17 @@ function showSaveState(){
 
 function makeMap(type, saved){
   const M = {type, year:START_YEAR, pop:0, money:2000, env:100, jobs:0, housing:0, tiles:[], tileMeshes:[],
-             group:new THREE.Group(), hist:[], logs:[], hints:{}, done:{}, ready:false};
+             group:new THREE.Group(), blds:[], hist:[], logs:[], hints:{}, done:{}, ready:false};
   genTerrain(M); buildTerrain(M); makeRoadPlan(M);
   if(saved){
     // 건물 다시 짓기: 도로를 먼저 지어야 기차역·다리 방향이 맞는다 (M.ready=false → 애니메이션·힌트 없음)
     const list = saved.buildings.slice().sort((a,b)=>(a.b==='road'?0:1)-(b.b==='road'?0:1));
     for(const bd of list){
-      const t = get(M, bd.x, bd.z);
-      if(!t || t.b || (t.water && bd.b!=='road')) continue;
-      place(M, bd.b, t, {variant: bd.variant || null}, true);
-      t.bmesh.userData.shown = true;
+      const tiles = [];
+      for(let i=0;i<bd.w;i++) for(let j=0;j<bd.d;j++) tiles.push(get(M, bd.x+i, bd.z+j));
+      if(tiles.some(t => !t || t.b || (t.water && bd.b!=='road'))) continue;
+      const bld = place(M, bd.b, {tiles, ax:bd.x, az:bd.z, w:bd.w, d:bd.d, variant: bd.variant || null}, true);
+      bld.mesh.userData.shown = true;
     }
     Object.assign(M, {year:saved.year, pop:saved.pop, money:saved.money, roadIdx:saved.roadIdx,
       hist:saved.hist.map(h=>({year:h.year,pop:h.pop})), logs:saved.logs.slice(0,MAX_LOGS).map(l=>({year:l.year,text:l.text})),
@@ -787,7 +856,7 @@ function makeMap(type, saved){
 function calc(M){
   const c = {road:0,house:0,farm:0,paddy:0,terrace:0,port:0,tree:0,shop:0,factory:0,apt:0,tourism:0,wind:0,
              school:0,station:0,hospital:0,park:0,mart:0,office:0,stadium:0};
-  for(const t of M.tiles) if(t.b){ c[t.b]++; if(t.b==='farm') c[t.variant]++; }
+  for(const B of M.blds){ c[B.b]++; if(B.b==='farm') c[B.variant]++; }   // 건물 수(칸 수가 아님)
   const housing = c.house*5 + c.apt*30;
   const jobs = c.paddy*3 + c.terrace*2 + c.port*12 + c.factory*25 + c.shop*10 + c.tourism*15 + c.wind*3
              + c.school*8 + c.station*10 + c.hospital*15 + c.park*1 + c.mart*20 + c.office*40 + c.stadium*10;
@@ -815,46 +884,85 @@ function simulate(M){
   M.env = env; M.jobs = jobs; M.housing = housing;
 }
 
-function place(M, tool, t, r, free){
-  if(tool==='bulldoze'){
-    if(t.bmesh) M.group.remove(t.bmesh);
-    t.b=null; t.variant=null; t.bmesh=null;
-    if(!free) M.money -= r.cost;
-    return;
+// 건물 하나의 3D 모델. 바깥 그룹(위치·등장 애니메이션) 안에 모델을 넣는다
+function makeBldMesh(M, B){
+  const outer = new THREE.Group(), anims = [];
+  const key = B.b==='tourism' ? 'tourism-'+B.variant : B.b;
+  const collect = g => { if(g.userData.anim) anims.push(g.userData.anim); };
+  const t0 = B.tiles[0];
+  if(B.tiles.length===1){
+    const g = buildMesh(M, B.b, t0); collect(g); outer.add(g);
+    outer.position.set(wx(t0.x), t0.h, wz(t0.z));
+  } else {
+    const cx = wx(B.x)+(B.w-1)/2, cz = wz(B.z)+(B.d-1)/2;
+    if(TILED(key)){
+      // 칸마다 모델: 각 칸의 높이에 맞춰 놓여 비탈(스키장)이나 해안선(항구·해수욕장)을 따라감
+      outer.position.set(cx, 0, cz);
+      B.tiles.forEach((t,i) => { const g = buildMesh(M, B.b, t, i); g.position.set(wx(t.x)-cx, t.h, wz(t.z)-cz); collect(g); outer.add(g); });
+    } else {
+      // 모델 하나를 건물 크기만큼 늘림. 자리 안의 작은 높이 차는 받침돌로 메움
+      const hs = B.tiles.map(t=>t.h), top = Math.max(...hs), dh = top - Math.min(...hs);
+      outer.position.set(cx, top, cz);
+      if(dh>0) outer.add(box(B.w-0.04, dh, B.d-0.04, '#b5ab9b', 0, -dh, 0));
+      const scaler = new THREE.Group(); scaler.scale.set(B.w, SY[key]||1, B.d);
+      const g = buildMesh(M, B.b, t0);
+      if(B.b==='station') g.rotation.y = B.w>=B.d ? 0 : Math.PI/2;   // 선로를 긴 방향으로
+      collect(g); scaler.add(g); outer.add(scaler);
+    }
   }
-  t.b = tool; t.variant = r.variant || null;
-  const g = buildMesh(M, tool, t);
-  g.position.set(wx(t.x), t.h, wz(t.z));
-  M.group.add(g); t.bmesh = g;
+  if(anims.length) outer.userData.anim = (dt,time) => anims.forEach(f=>f(dt,time));
+  return outer;
+}
+
+// r: {tiles, ax, az, w, d, variant, cost, hint} (footCheck/choosePlace 결과). 지은 건물을 돌려줌
+function place(M, tool, r, free){
+  if(tool==='bulldoze'){
+    const B = r.bld;
+    M.group.remove(B.mesh);
+    for(const t of B.tiles){ t.b=null; t.variant=null; t.bld=null; }
+    M.blds.splice(M.blds.indexOf(B), 1);
+    if(!free) M.money -= r.cost;
+    return null;
+  }
+  const B = {b:tool, variant:r.variant||null, x:r.ax, z:r.az, w:r.w, d:r.d, tiles:r.tiles};
+  for(const t of B.tiles){ t.b = tool; t.variant = B.variant; t.bld = B; }
+  B.mesh = makeBldMesh(M, B);
+  M.group.add(B.mesh); M.blds.push(B);
   if(!free) M.money -= r.cost;
-  if(M.ready){ g.scale.setScalar(0.01); pops.push({g,k:0}); }
+  if(M.ready){ B.mesh.scale.setScalar(0.01); pops.push({g:B.mesh,k:0}); }
   if(M.ready && r.hint && !M.hints[r.hint]){ M.hints[r.hint]=true; addLog(M, HINTS[r.hint]); if(M===cur()) toast(HINTS[r.hint], 3800); }
+  return B;
 }
 
 function autoPlace(M, tool, n){
   if(tool==='road'){
     let k=0;
     while(k<n && M.roadIdx < M.roadPlan.length){
-      const t = M.roadPlan[M.roadIdx++]; const r = check(M,'road',t);
-      if(r.ok){ place(M,'road',t,r,true); k++; }
+      const t = M.roadPlan[M.roadIdx++]; const r = footCheck(M,'road',t.x,t.z,1,1);
+      if(r.ok){ place(M,'road',r,true); k++; }
     }
     return;
   }
+  const [w0, d0] = footSize(M, tool);
+  const orients = w0===d0 ? [[w0,d0]] : [[w0,d0],[d0,w0]];
   for(let i=0;i<n;i++){
     let best=null, bs=-1e9;
-    for(const t of M.tiles){
-      const r = check(M,tool,t); if(!r.ok) continue;
-      const d = Math.hypot(t.x-M.cx, t.z-M.cz), rnd = hash(t.x+i, t.z, M.year);
-      let s = -d + (adjRoad(M,t)?4:0) + rnd*1.5;
-      if(tool==='farm') s = -Math.abs(d-5) + rnd*2 - (adjRoad(M,t)?1:0);
-      if(tool==='tree') s = d*0.35 + slope(M,t)*1.5 + rnd*4 - (adjRoad(M,t)?3:0) + (M.type==='coast' && t.kind==='sand'?3:0);
-      if(tool==='tourism') s = (M.type==='mountain'? t.h*1.5 - d*0.3 : -Math.abs(t.z-M.cz)*0.4) + rnd;
-      if(tool==='wind') s = t.h*2 + rnd*3 + (t.kind==='sand'?2:0);
-      if(tool==='port') s = -Math.abs(t.z-M.cz) + rnd;
-      if(s>bs){ bs=s; best=[t,r]; }
+    for(const t of M.tiles) for(const [w,d] of orients){
+      const r = footCheck(M,tool,t.x,t.z,w,d); if(!r || !r.ok) continue;
+      // 건물 가운데 위치·평균 높이로 점수 계산
+      const cx = t.x+(w-1)/2, cz = t.z+(d-1)/2, h = r.tiles.reduce((a,u)=>a+u.h,0)/r.tiles.length;
+      const road = r.tiles.length>1 ? r.road : adjRoad(M,t);
+      const dd = Math.hypot(cx-M.cx, cz-M.cz), rnd = hash(t.x+i, t.z, M.year);
+      let s = -dd + (road?4:0) + rnd*1.5;
+      if(tool==='farm') s = -Math.abs(dd-5) + rnd*2 - (road?1:0);
+      if(tool==='tree') s = dd*0.35 + slope(M,t)*1.5 + rnd*4 - (road?3:0) + (M.type==='coast' && t.kind==='sand'?1:0);
+      if(tool==='tourism') s = (M.type==='mountain'? h*1.5 - dd*0.3 : -Math.abs(cz-M.cz)*0.4) + rnd;
+      if(tool==='wind') s = h*2 + rnd*3 + (t.kind==='sand'?2:0);
+      if(tool==='port') s = -Math.abs(cz-M.cz) + rnd;
+      if(s>bs){ bs=s; best=r; }
     }
     if(!best) break;
-    place(M, tool, best[0], best[1], true);
+    place(M, tool, best, true);
   }
 }
 
@@ -870,6 +978,7 @@ function loadOrMakeMap(type){
   return makeMap(type);
 }
 store.probe();
+try{ for(const k of ['coast','mountain','plain']) localStorage.removeItem(`village3d:v1:${k}`); }catch(e){}   // 예전 20×20 저장 정리
 maps.coast = loadOrMakeMap('coast');
 maps.mountain = loadOrMakeMap('mountain');
 maps.plain = loadOrMakeMap('plain');
@@ -947,7 +1056,7 @@ function startAuto(){
     const plan = PLAN[M.type][M.year] || [];
     for(const [tool,n] of plan) autoPlace(M, tool, n);
     // 자동 모드에서 새로 지은 건물에도 팝 애니메이션
-    for(const t of M.tiles) if(t.bmesh && !t.bmesh.userData.shown){ t.bmesh.userData.shown=true; t.bmesh.scale.setScalar(0.01); pops.push({g:t.bmesh,k:0}); }
+    for(const B of M.blds) if(!B.mesh.userData.shown){ B.mesh.userData.shown=true; if(!pops.some(p=>p.g===B.mesh)){ B.mesh.scale.setScalar(0.01); pops.push({g:B.mesh,k:0}); } }
     for(const [tool] of plan){ const k = autoHint(M,tool); if(k && !M.hints[k]){ M.hints[k]=true; addLog(M, HINTS[k]); } }
     nextTurn();
   };
@@ -971,7 +1080,8 @@ function renderTools(){
     const lock = M.year < T.year;
     let name = toolName(M,k), icon = toolIcon(M,k), sub;
     if(k==='port' && M.type!=='coast') sub = '바다 마을만';
-    sub = sub || (lock ? `🔒 ${T.year}년` : (k==='look'?'회전·확대':`💰 ${T.cost}`));
+    const [fw, fd] = footSize(M, k), size = fw*fd>1 ? ` · ${fw}×${fd}` : '';
+    sub = sub || (lock ? `🔒 ${T.year}년` : (k==='look'?'회전·확대':`💰 ${T.cost}${size}`));
     const b = document.createElement('button');
     b.className = 'tool' + (tool===k?' on':'') + (lock?' lock':'');
     b.innerHTML = `<span class="ic">${icon}</span><span>${name}<small>${sub}</small></span>`;
@@ -1141,12 +1251,17 @@ function showTip(e, t){
   if(!t){ tip.style.display='none'; marker.visible=false; return; }
   let html = `<b>${terrainName(M,t)}</b>`;
   if(!t.water) html += `<br>해발 ${Math.round(t.h*80)}m · 경사 ${slope(M,t)<=0.25?'평평함':slope(M,t)<=0.75?'약간 비탈':'가파름'}`;
-  if(t.b) html += `<br>🏗️ ${BNAME(t)}`;
-  marker.position.set(wx(t.x), Math.max(t.h, -0.08)+0.06+(t.b==='apt'?0:0), wz(t.z));
+  if(t.b) html += `<br>🏗️ ${BNAME(t)}${t.bld && t.bld.tiles.length>1 ? ` (${t.bld.w}×${t.bld.d}칸)` : ''}`;
   if(tool!=='look'){
-    const r = check(M, tool, t);
+    const r = choosePlace(M, tool, t);
     const enough = r.ok && M.money >= r.cost;
+    const [fw, fd] = footSize(M, tool);
+    if(tool!=='bulldoze' && fw*fd>1) html += `<br>📐 ${toolName(M,tool)}: ${fw}×${fd}칸 필요`;
     html += r.ok ? `<br>${enough?'✅':'💸'} ${r.msg?r.msg+' · ':''}비용 ${r.cost}${enough?'':' (예산 부족)'}` : (r.msg?`<br>❌ ${r.msg}`:'');
+    // 건물이 차지할 자리 전체를 초록(가능)/빨강(불가)으로 미리 보여 줌
+    const top = Math.max(...r.tiles.map(u=>Math.max(u.h,-0.08)));
+    marker.scale.set(r.w, 1, r.d);
+    marker.position.set(wx(r.ax)+(r.w-1)/2, top+0.06, wz(r.az)+(r.d-1)/2);
     marker.material.color.set(enough ? '#00e676' : '#ff5252');
     marker.visible = true;
   } else marker.visible = false;
@@ -1156,10 +1271,10 @@ function showTip(e, t){
 
 function tryBuild(t, quiet){
   const M = cur(); if(!t || tool==='look') return;
-  const r = check(M, tool, t);
+  const r = choosePlace(M, tool, t);
   if(!r.ok){ if(!quiet && r.msg) toast('❌ '+r.msg); return; }
-  if(M.money < r.cost){ if(!quiet) toast('💸 예산이 부족해요! 5년을 지나 세금을 모아 보세요.'); return; }
-  place(M, tool, t, r, false);
+  if(M.money < r.cost){ if(!quiet) toast('💸 예산이 부족해요! 시간이 흐르면 세금이 들어와요.'); return; }
+  place(M, tool, r, false);
   updateUI();
   if(painting) paintDirty = true; else store.save(M);
 }
@@ -1205,7 +1320,7 @@ function loop(){
   const pos = M.water.geometry.attributes.position;
   for(let i=0;i<pos.count;i++){ const x=pos.getX(i), z=pos.getZ(i); pos.setY(i, Math.sin(x*1.3+time*1.5)*0.03 + Math.cos(z*1.1+time*1.2)*0.03); }
   pos.needsUpdate = true; M.water.geometry.computeVertexNormals();
-  for(const c of clouds){ c.position.x += dt*0.4; if(c.position.x>24) c.position.x=-24; }
+  for(const c of clouds){ c.position.x += dt*0.4; if(c.position.x>24*SC) c.position.x=-24*SC; }
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }

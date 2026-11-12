@@ -79,6 +79,21 @@
   @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
   #modal-close[hidden]{display:none}
   #modal-close{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:9px 18px;background:var(--accent);color:#fff;margin-top:8px}
+  .guide-intro{font-size:15px;line-height:1.6;margin:0 0 12px}
+  .guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .guide-box{border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.6}
+  .guide-box h3{font-family:'Jua';font-weight:400;font-size:19px;margin:0 0 6px}
+  .guide-box ul{margin:0;padding-left:18px}
+  .guide-box li{margin:3px 0}
+  .guide-box .key{display:block;font-weight:700;margin-bottom:4px}
+  .g-pop{background:#e8f4fd}.g-money{background:#fff6dc}.g-jobs{background:#eaf7ea}
+  .guide-more{margin-top:8px}
+  .guide-more summary,.guide-all summary{cursor:pointer;font-weight:700;padding:4px 0}
+  .guide-more table{background:rgba(255,255,255,.7);border-radius:8px;font-size:13px}
+  #modal .guide-more td{padding:3px 8px}
+  #modal .guide-more td:last-child{text-align:right}
+  .guide-all{margin-top:12px;overflow-x:auto}
+  .guide-tip{margin-top:12px;padding:10px 14px;border-radius:12px;background:#f3eefb;font-size:14px;line-height:1.6}
   #panel-toggle{display:none}
   @media (max-width:900px){
     #panel{display:none;left:220px;width:auto}
@@ -137,6 +152,7 @@
   <button id="btn-auto" title="선생님용: 비밀번호가 필요해요">🔒 자동 발전 보기</button>
   <button id="btn-compare">⚖️ 마을 비교</button>
   <button id="btn-reset">↺ 다시 시작</button>
+  <button id="btn-help">❓ 도움말</button>
   <button id="panel-toggle">📋 정보</button>
 </div>
 
@@ -1231,7 +1247,84 @@ function askAutoPassword(){
 }
 $('btn-auto').onclick = () => autoTimer ? stopAuto() : (autoUnlocked ? startAuto() : askAutoPassword());
 $('btn-compare').onclick = () => { stopAuto(); showCompare(); };
-function closeModal(){ $('modal').hidden = true; $('modal-close').hidden = false; }
+function closeModal(){ $('modal').hidden = true; $('modal-close').hidden = false; $('modal-close').textContent = '닫기'; }
+// 도움말 숫자표: calc()·simulate()의 계산식과 같은 값 (계산식을 바꾸면 여기도 함께 고쳐요)
+const GUIDE_NUM = {
+  house:   {housing:5},
+  apt:     {housing:30, upkeep:10, env:-1},
+  paddy:   {jobs:3, income:22, label:'🌾 논'},
+  terrace: {jobs:2, income:14, label:'⛰️ 계단식 밭'},
+  port:    {jobs:12, income:80, env:-2},
+  factory: {jobs:25, income:120, upkeep:20, env:-8},
+  shop:    {jobs:10, income:60},
+  tourism: {jobs:15, income:130, envMul:true},
+  wind:    {jobs:3, income:50, env:+1},
+  school:  {jobs:8, upkeep:10},
+  station: {jobs:10, income:60},
+  hospital:{jobs:15, income:30, upkeep:15},
+  park:    {jobs:1, upkeep:3, env:+5},
+  mart:    {jobs:20, income:90, env:-1},
+  office:  {jobs:40, income:160, env:-1.5},
+  stadium: {jobs:10, income:120, envMul:true, env:-1},
+  road:    {upkeep:2, env:-0.2, label:'🛣️ 도로 1칸'},
+  tree:    {env:+1.2, label:'🌲 숲 1칸'},
+};
+const guideLabel = k => GUIDE_NUM[k].label || `${TOOLS[k].icon} ${TOOLS[k].name}`;
+function guideDetail(title, field, unit){
+  const rows = Object.keys(GUIDE_NUM).filter(k => GUIDE_NUM[k][field]).sort((a,b) => GUIDE_NUM[b][field]-GUIDE_NUM[a][field]);
+  return `<details class="guide-more"><summary>${title}</summary><table>${rows.map(k => {
+    const g = GUIDE_NUM[k], mul = field==='income' && g.envMul ? ' <small>× 환경 점수%</small>' : '';
+    return `<tr><td>${guideLabel(k)}</td><td>${field==='upkeep'?'−':field==='income'?'+':''}${g[field]}${unit}${mul}</td></tr>`;
+  }).join('')}${field==='income' ? '<tr><td>👪 주민 1명당 세금</td><td>+4</td></tr>' : ''}</table></details>`;
+}
+function guideAllTable(){
+  const f = (v, plus) => v ? (plus && v>0 ? '+' : '') + v : '·';
+  return `<table><tr><th>건물</th><th>짓는 돈</th><th>🏠 살 수 있는 사람</th><th>💼 일자리</th><th>💰 수입</th><th>💸 유지비</th><th>🌿 환경</th></tr>${
+    Object.keys(GUIDE_NUM).map(k => { const g = GUIDE_NUM[k], T = TOOLS[k] || TOOLS.farm;
+      return `<tr><td>${guideLabel(k)}</td><td>${T.cost}</td><td>${f(g.housing)}</td><td>${f(g.jobs)}</td><td>${g.income ? '+'+g.income+(g.envMul?'*':'') : '·'}</td><td>${g.upkeep ? '−'+g.upkeep : '·'}</td><td>${f(g.env, true)}</td></tr>`;
+    }).join('')}</table><p style="font-size:13px;margin:4px 0 0">수입·유지비는 <b>5년마다</b> 계산돼요. * 표시는 환경 점수가 높을수록 더 벌어요(환경 100점이면 전부, 50점이면 절반). 👪 주민 1명당 세금 +4도 들어와요.</p>`;
+}
+function showGuide(first){
+  stopTime();
+  $('modal-body').innerHTML = `<h2>🏘️ 우리 마을을 키워 볼까요?</h2>
+    <p class="guide-intro">마을에 건물을 짓고 <b>▶ 시간 흐르기</b>를 누르면 5년씩 시간이 지나요.
+    시간이 지날 때마다 <b>인구 · 예산 · 일자리</b>가 바뀌어요. 셋은 서로 이어져 있어요!</p>
+    <div class="guide-grid">
+      <div class="guide-box g-pop"><h3>👪 인구를 늘리려면</h3>
+        <span class="key">사람이 이사 오려면 ‘살 집’과 ‘일할 곳’이 모두 필요해요.</span>
+        <ul>
+          <li>🏠 주택(5명), 🏢 아파트(30명)를 지어 <b>살 집</b>을 만들어요.</li>
+          <li>💼 <b>일자리</b>가 없으면 집이 있어도 사람이 오지 않아요.</li>
+          <li>🌿 <b>환경</b>이 나빠지면(40점 아래) 사람들이 잘 오지 않아요.</li>
+          <li>🏫 인구 80명이 넘으면 학교, 🏥 200명이 넘으면 병원이 꼭 필요해요.</li>
+          <li>🚉 기차역이 있으면 사람들이 더 많이 찾아와요.</li>
+        </ul>${guideDetail('🔍 건물마다 몇 명이 살 수 있을까?', 'housing', '명')}</div>
+      <div class="guide-box g-jobs"><h3>💼 일자리를 늘리려면</h3>
+        <span class="key">사람들이 일하는 건물을 지어요.</span>
+        <ul>
+          <li>🏙️ 고층빌딩·🏭 공장·🛒 대형마트는 일자리가 아주 많아요.</li>
+          <li>⚓ 항구·🏖️ 관광지·🏥 병원·🏪 상가도 일자리가 생겨요.</li>
+          <li>🌾 논밭은 일자리가 적지만 환경을 해치지 않아요.</li>
+          <li>⚠️ 공장은 일자리가 많은 대신 환경을 크게 나쁘게 해요.</li>
+        </ul>${guideDetail('🔍 건물마다 일자리는 몇 개?', 'jobs', '개')}</div>
+      <div class="guide-box g-money"><h3>💰 예산을 늘리려면</h3>
+        <span class="key">5년마다 세금과 수입이 들어오고, 유지비는 나가요.</span>
+        <ul>
+          <li>👪 <b>인구가 많을수록</b> 세금이 많이 들어와요.</li>
+          <li>🏙️ 고층빌딩·🏖️ 관광지·🏭 공장·🛒 대형마트가 돈을 많이 벌어요.</li>
+          <li>🌿 관광지와 경기장은 <b>환경이 좋을수록</b> 더 많이 벌어요.</li>
+          <li>💸 도로·아파트·학교·병원·공장·공원은 5년마다 <b>유지비</b>가 나가요.</li>
+          <li>🧹 철거해도 지은 돈은 돌려받지 못해요.</li>
+        </ul>${guideDetail('🔍 5년마다 버는 돈 (수입)', 'income', '')}${guideDetail('🔍 5년마다 나가는 돈 (유지비)', 'upkeep', '')}</div>
+    </div>
+    <div class="guide-tip">💡 <b>비법:</b> 집만 많이 짓거나 일자리만 많이 지으면 마을이 크지 않아요.
+    <b>집 ↔ 일자리 ↔ 환경</b>의 균형을 맞춰 보세요! 우리 마을의 땅(바다·산·들)에 맞는 건물을 고르는 것도 중요해요.
+    <br>📝 5년마다 얼마를 벌었는지는 오른쪽 <b>마을 기록</b>에서 볼 수 있어요.</div>
+    <details class="guide-all"><summary>📊 모든 건물 숫자 한눈에 보기</summary>${guideAllTable()}</details>`;
+  $('modal-close').textContent = first ? '🚀 마을 가꾸기 시작!' : '닫기';
+  $('modal').hidden = false;
+}
+$('btn-help').onclick = () => { stopAuto(); showGuide(false); };
 function showConfirm(html, yesLabel, onYes){
   $('modal-body').innerHTML = html +
     `<div class="confirm-btns"><button id="confirm-yes">${yesLabel}</button><button id="confirm-no">아니요</button></div>`;
@@ -1355,6 +1448,7 @@ function loop(){
   requestAnimationFrame(loop);
 }
 setControlMode(); switchMap('coast'); loop();
+showGuide(true);
 if(!store.ok) showSaveState();
 else { const el=$('s-save'); el.textContent='💾 자동 저장'; el.title='건물을 짓거나 5년이 지날 때마다 이 브라우저에 저장돼요'; }
 if(Object.values(maps).some(M=>M.restored)) toast('💾 지난번 마을을 불러왔어요', 3200);

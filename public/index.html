@@ -72,6 +72,11 @@
   .confirm-btns{display:flex;gap:8px;margin-top:12px}
   .confirm-btns button{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:9px 18px;background:#e9eef2;color:var(--ink)}
   .confirm-btns #confirm-yes{background:#e53935;color:#fff}
+  #pw-input{font-size:22px;letter-spacing:6px;width:180px;padding:8px 12px;border:2px solid #cfd8dc;border-radius:12px;text-align:center}
+  #pw-input:focus{outline:none;border-color:var(--accent)}
+  #pw-msg{color:#c62828;font-size:14px;min-height:20px;margin-top:6px}
+  .shake{animation:shake .3s}
+  @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
   #modal-close[hidden]{display:none}
   #modal-close{font-family:'Jua';font-size:16px;border:none;border-radius:12px;padding:9px 18px;background:var(--accent);color:#fff;margin-top:8px}
   #panel-toggle{display:none}
@@ -129,7 +134,7 @@
     <option value="30" selected>🚶 보통 30초</option>
     <option value="15">🐇 빠름 15초</option>
   </select>
-  <button id="btn-auto">▶ 자동 발전 보기</button>
+  <button id="btn-auto" title="선생님용: 비밀번호가 필요해요">🔒 자동 발전 보기</button>
   <button id="btn-compare">⚖️ 마을 비교</button>
   <button id="btn-reset">↺ 다시 시작</button>
   <button id="panel-toggle">📋 정보</button>
@@ -1045,7 +1050,7 @@ setInterval(() => {
 }, 250);
 
 let autoTimer = null;
-function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } const b=document.getElementById('btn-auto'); b.textContent='▶ 자동 발전 보기'; b.classList.remove('playing'); }
+function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } const b=document.getElementById('btn-auto'); b.textContent=(autoUnlocked?'▶':'🔒')+' 자동 발전 보기'; b.classList.remove('playing'); }
 function startAuto(){
   if(cur().year >= END_YEAR){ toast('이미 2030년이에요. ↺ 다시 시작을 눌러 보세요.'); return; }
   stopTime(true);
@@ -1199,7 +1204,32 @@ $('time-speed').onchange = () => {
   timeElapsed = Math.min(timeElapsed, timeSpeed()-1);
   renderTimeBtn();
 };
-$('btn-auto').onclick = () => autoTimer ? stopAuto() : startAuto();
+// 자동 발전 보기는 선생님용: 비밀번호를 맞혀야 시작. 한 번 맞히면 새로고침 전까지 다시 묻지 않음
+// (비밀번호는 소스에 그대로 두지 않고 해시값만 둠. 학생이 바로 누르는 것을 막는 정도의 잠금)
+let autoUnlocked = false;
+const AUTO_PW_HASH = 'd8ee62e2';
+const pwHash = s => { let x = 0x811c9dc5; for(const ch of 'village3d:'+s){ x ^= ch.charCodeAt(0); x = Math.imul(x, 0x01000193) >>> 0; } return x.toString(16); };
+function askAutoPassword(){
+  stopTime();
+  showConfirm(`<h2>🔒 선생님 확인</h2>
+    <p style="font-size:15px;line-height:1.7">자동 발전 보기는 선생님만 켤 수 있어요.<br>비밀번호를 입력해 주세요.</p>
+    <input id="pw-input" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="비밀번호">
+    <div id="pw-msg"></div>`, '확인', () => {});
+  const input = $('pw-input'), yes = $('confirm-yes');
+  $('confirm-no').textContent = '취소';
+  const submit = () => {
+    if(pwHash(input.value.trim()) === AUTO_PW_HASH){
+      autoUnlocked = true; closeModal(); toast('🔓 자동 발전 보기를 시작해요'); startAuto();
+    } else {
+      $('pw-msg').textContent = '비밀번호가 맞지 않아요.';
+      input.value = ''; input.classList.remove('shake'); void input.offsetWidth; input.classList.add('shake'); input.focus();
+    }
+  };
+  yes.onclick = submit;
+  input.onkeydown = e => { if(e.key==='Enter') submit(); };
+  setTimeout(() => input.focus(), 50);
+}
+$('btn-auto').onclick = () => autoTimer ? stopAuto() : (autoUnlocked ? startAuto() : askAutoPassword());
 $('btn-compare').onclick = () => { stopAuto(); showCompare(); };
 function closeModal(){ $('modal').hidden = true; $('modal-close').hidden = false; }
 function showConfirm(html, yesLabel, onYes){
